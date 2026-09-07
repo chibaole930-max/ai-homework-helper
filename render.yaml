@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: ai-homework-helper
+    runtime: node
+    plan: free
+    buildCommand: bun install && bun run build
+    startCommand: bun run start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
