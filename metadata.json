@@ -1,0 +1,6 @@
+{
+  "name": "Học Tập Lớp 12 - Soạn & Giải Bài",
+  "description": "Ứng dụng soạn bài ghi thông minh và giải chi tiết bài tập tất cả các môn lớp 12 dựa trên nguồn học liệu Lời Giải Hay (loigiaihay.com).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
