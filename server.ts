@@ -167,10 +167,13 @@ Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
   + "Lời giải chi tiết" (Từng bước suy luận chặt chẽ, mạch lạc, chính xác tuyệt đối, dễ hiểu cho mọi đối tượng học sinh)
   + "Đáp số / Kết luận" (Ngắn gọn, chuẩn xác)
 - Luôn có hộp mẹo nhớ, lời khuyên và cảnh báo bẫy sai lầm hay gặp trong bài kiểm tra và đề thi THPT Quốc gia.
-- QUY TẮC ĐỊNH DẠNG KÝ HIỆU ĐỘ & TOÁN HỌC:
-  + Đối với Địa lí: Ghi tọa độ vĩ độ/kinh độ bằng ký hiệu độ chuẩn Unicode đẹp mắt: 23°23'B (hoặc 23°23' Bắc), 102°09'Đ (hoặc 102°09' Đông), 8°34'B, 109°28'Đ. Không viết dạng mã LaTeX thô gây lỗi hiển thị.
-  + Đối với nhiệt độ, góc: Viết 25°C, 100°C, góc 60°, 90°.
-  + Đối với công thức Toán/Lý/Hóa: Dùng chuẩn LaTeX chuẩn mực kẹp trong dấu $...$ (ví dụ: $f'(x) = 3x^2$, $\\int_0^1 x dx$).`;
+- QUY TẮC ĐỊNH DẠNG KÝ HIỆU ĐỘ, ĐƠN VỊ & TOÁN HỌC (RẤT QUAN TRỌNG):
+  + Đối với Địa lí, Lịch sử, Văn học, GD-KTPL: Viết toàn bộ văn bản, phân tích và số liệu bằng tiếng Việt tự nhiên thông thường.
+  + TUYỆT ĐỐI KHÔNG dùng dấu $...$ hay lệnh LaTeX \\text{...} cho câu văn hoặc từ ngữ tiếng Việt.
+  + Số liệu thống kê, đơn vị đo lường (ví dụ: 1 500 - 2 000 mm/năm, độ ẩm > 80%, diện tích 331 212 km², dân số 100 triệu người): VIẾT BẰNG VĂN BẢN BÌNH THƯỜNG, TUYỆT ĐỐI KHÔNG đặt trong dấu $...$.
+  + Tọa độ địa lí: Ghi bằng ký hiệu Unicode chuẩn đẹp mắt: 23°23'B (hoặc 23°23' Bắc), 102°09'Đ (hoặc 102°09' Đông), 8°34'B, 109°28'Đ. Không viết $23^\\circ 23'B$.
+  + Nhiệt độ, góc: Viết 25°C, 100°C, góc 60°, 90°.
+  + Chỉ dùng dấu $...$ duy nhất cho công thức TOÁN HỌC, VẬT LÝ, HÓA HỌC thực sự (ví dụ: $f'(x) = 3x^2$, $\\int_0^1 x dx$).`;
 
       let promptGoal = "";
       if (noteStyle === "loigiaihay_full" || noteStyle === "standard") {
