@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import { Pool } from "pg";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
@@ -11,7 +12,9 @@ dotenv.config();
 // ---------------------------------------------------------------------------
 // KHO BÀI MẪU CHIA SẺ (Community Sample Library)
 // Mọi người truy cập web đều xem được và đóng góp bài mẫu, dữ liệu đồng bộ
-// qua API server và được lưu lại trong file JSON để trong cùng một lần deploy.
+// qua API server. Dữ liệu được lưu VĨNH VIỄN trong PostgreSQL miễn phí
+// (Supabase/Neon) qua biến môi trường DATABASE_URL. Nếu chưa cấu hình
+// DATABASE_URL thì tự động dùng file JSON để lưu trong cùng một lần deploy.
 // ---------------------------------------------------------------------------
 
 interface CommunityPresetItem {
@@ -33,7 +36,104 @@ interface CommunityPresetItem {
 
 const COMMUNITY_DATA_FILE = path.join(process.cwd(), "data", "community-presets.json");
 
-function loadCommunityPresets(): CommunityPresetItem[] {
+// Kết nối Postgres nếu có DATABASE_URL (Supabase / Neon miễn phí)
+function createPgPool(): Pool | null {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  return new Pool({
+    connectionString: url,
+    ssl: url.includes("localhost") || url.includes("127.0.0.1")
+      ? false
+      : { rejectUnauthorized: false },
+  });
+}
+
+const pgPool = createPgPool();
+
+function rowToPreset(row: any): CommunityPresetItem {
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    subject: row.subject,
+    subjectId: row.subjectId,
+    textbook: row.textbook,
+    content: row.content,
+    date: row.date || new Date(row.createdAt).toLocaleDateString("vi-VN"),
+    isFavorite: row.isFavorite,
+    style: row.style || undefined,
+    author: row.author,
+    likes: row.likes,
+    createdAt: row.createdAt instanceof Date
+      ? row.createdAt.toISOString()
+      : String(row.createdAt),
+    fromCommunity: row.fromCommunity,
+  };
+}
+
+// Tạo bảng (nếu chưa có) và seed bài mẫu mặc định lần đầu
+async function ensureCommunityTable(pool: Pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS community_presets (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'note',
+      title TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      "subjectId" TEXT NOT NULL,
+      textbook TEXT NOT NULL,
+      content TEXT NOT NULL,
+      date TEXT,
+      "isFavorite" BOOLEAN NOT NULL DEFAULT false,
+      style TEXT,
+      author TEXT NOT NULL DEFAULT 'Kho Học Liệu Mẫu',
+      likes INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "fromCommunity" BOOLEAN NOT NULL DEFAULT false
+    )
+  `);
+  const { rows } = await pool.query(
+    "SELECT COUNT(*)::int AS c FROM community_presets"
+  );
+  if (rows[0].c === 0) {
+    for (const p of PRESET_LESSON_NOTES) {
+      await pool.query(
+        `INSERT INTO community_presets
+           (id, type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, author, likes, "fromCommunity")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,false)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          p.id,
+          p.type,
+          p.title,
+          p.subject,
+          p.subjectId,
+          p.textbook,
+          p.content,
+          p.date,
+          p.isFavorite,
+          p.style || null,
+          "Kho Học Liệu Mẫu",
+        ]
+      );
+    }
+    console.log("[Community] Đã seed bài mẫu mặc định vào database PostgreSQL.");
+  }
+}
+
+if (pgPool) {
+  ensureCommunityTable(pgPool).catch((err) => {
+    console.error("[Community] Lỗi khởi tạo bảng PostgreSQL:", err);
+  });
+}
+
+async function loadAllPresets(): Promise<CommunityPresetItem[]> {
+  if (pgPool) {
+    const { rows } = await pgPool.query(
+      'SELECT * FROM community_presets ORDER BY "createdAt" DESC'
+    );
+    return rows.map(rowToPreset);
+  }
+  // Fallback: file JSON
   try {
     if (fs.existsSync(COMMUNITY_DATA_FILE)) {
       const raw = fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8");
@@ -41,7 +141,7 @@ function loadCommunityPresets(): CommunityPresetItem[] {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch (err) {
-    console.warn("[Community] Không đọc được dữ liệu, dùng seed mặc định:", err);
+    console.warn("[Community] Không đọc được dữ liệu JSON, dùng seed mặc định:", err);
   }
   return PRESET_LESSON_NOTES.map((p) => ({
     ...p,
@@ -52,20 +152,68 @@ function loadCommunityPresets(): CommunityPresetItem[] {
   }));
 }
 
-function saveCommunityPresets(items: CommunityPresetItem[]) {
-  try {
-    fs.mkdirSync(path.dirname(COMMUNITY_DATA_FILE), { recursive: true });
-    fs.writeFileSync(
-      COMMUNITY_DATA_FILE,
-      JSON.stringify(items, null, 2),
-      "utf-8"
+async function insertPreset(item: CommunityPresetItem) {
+  if (pgPool) {
+    await pgPool.query(
+      `INSERT INTO community_presets
+         (id, type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, author, likes, "fromCommunity")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,true)`,
+      [
+        item.id,
+        item.type,
+        item.title,
+        item.subject,
+        item.subjectId,
+        item.textbook,
+        item.content,
+        item.date,
+        item.isFavorite,
+        item.style || null,
+        item.author,
+      ]
     );
-  } catch (err) {
-    console.warn("[Community] Không lưu được dữ liệu:", err);
+    return;
   }
+  // Fallback: file JSON
+  let list: CommunityPresetItem[] = [];
+  try {
+    if (fs.existsSync(COMMUNITY_DATA_FILE)) {
+      list = JSON.parse(fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8"));
+    }
+  } catch {
+    list = [];
+  }
+  if (!Array.isArray(list)) list = [];
+  list = [item, ...list];
+  fs.mkdirSync(path.dirname(COMMUNITY_DATA_FILE), { recursive: true });
+  fs.writeFileSync(COMMUNITY_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
 }
 
-let communityPresets: CommunityPresetItem[] = loadCommunityPresets();
+async function bumpLikes(id: string, liked: boolean): Promise<number | null> {
+  if (pgPool) {
+    const sign = liked ? 1 : -1;
+    const { rows } = await pgPool.query(
+      `UPDATE community_presets
+         SET likes = GREATEST(0, likes + $2)
+       WHERE id = $1
+       RETURNING likes`,
+      [id, sign]
+    );
+    return rows.length ? rows[0].likes : null;
+  }
+  // Fallback: file JSON
+  try {
+    const raw = fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8");
+    const list = JSON.parse(raw);
+    const item = list.find((x: any) => x.id === id);
+    if (!item) return null;
+    item.likes = Math.max(0, (item.likes || 0) + (liked ? 1 : -1));
+    fs.writeFileSync(COMMUNITY_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
+    return item.likes;
+  } catch {
+    return null;
+  }
+}
 
 function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -473,16 +621,22 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
   });
 
   // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng)
-  app.get("/api/community/presets", (_req, res) => {
-    res.json({
-      items: communityPresets,
-      total: communityPresets.length,
-      syncedAt: new Date().toISOString(),
-    });
+  app.get("/api/community/presets", async (_req, res) => {
+    try {
+      const items = await loadAllPresets();
+      res.json({
+        items,
+        total: items.length,
+        syncedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("Error loading community presets:", err);
+      res.status(500).json({ error: "Không tải được kho bài mẫu." });
+    }
   });
 
   // API: Đóng góp bài mẫu mới vào kho chung
-  app.post("/api/community/presets", (req, res) => {
+  app.post("/api/community/presets", async (req, res) => {
     try {
       const {
         subject,
@@ -522,10 +676,10 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         fromCommunity: true,
       };
 
-      communityPresets = [newItem, ...communityPresets];
-      saveCommunityPresets(communityPresets);
+      await insertPreset(newItem);
+      const items = await loadAllPresets();
 
-      res.status(201).json({ item: newItem, total: communityPresets.length });
+      res.status(201).json({ item: newItem, total: items.length });
     } catch (err: any) {
       console.error("Error adding community preset:", err);
       res.status(500).json({ error: "Không thể đóng góp bài mẫu. Vui lòng thử lại." });
@@ -533,16 +687,19 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
   });
 
   // API: Bày tỏ thích / bỏ thích một bài mẫu
-  app.post("/api/community/presets/:id/like", (req, res) => {
-    const id = req.params.id;
-    const liked = req.body?.liked === true;
-    const item = communityPresets.find((p) => p.id === id);
-    if (!item) {
-      return res.status(404).json({ error: "Không tìm thấy bài mẫu." });
+  app.post("/api/community/presets/:id/like", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const liked = req.body?.liked === true;
+      const newLikes = await bumpLikes(id, liked);
+      if (newLikes === null) {
+        return res.status(404).json({ error: "Không tìm thấy bài mẫu." });
+      }
+      res.json({ id, likes: newLikes });
+    } catch (err: any) {
+      console.error("Error liking community preset:", err);
+      res.status(500).json({ error: "Không cập nhật được lượt thích." });
     }
-    item.likes = liked ? item.likes + 1 : Math.max(0, item.likes - 1);
-    saveCommunityPresets(communityPresets);
-    res.json({ id, likes: item.likes });
   });
 
   // Vite middleware for development
