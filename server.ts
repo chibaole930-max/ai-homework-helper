@@ -1,10 +1,71 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { PRESET_LESSON_NOTES } from "./src/data/presets";
 
 dotenv.config();
+
+// ---------------------------------------------------------------------------
+// KHO BÀI MẪU CHIA SẺ (Community Sample Library)
+// Mọi người truy cập web đều xem được và đóng góp bài mẫu, dữ liệu đồng bộ
+// qua API server và được lưu lại trong file JSON để trong cùng một lần deploy.
+// ---------------------------------------------------------------------------
+
+interface CommunityPresetItem {
+  id: string;
+  type: "note" | "exercise";
+  title: string;
+  subject: string;
+  subjectId: string;
+  textbook: string;
+  content: string;
+  date: string;
+  isFavorite: boolean;
+  style?: string;
+  author: string;
+  likes: number;
+  createdAt: string;
+  fromCommunity?: boolean;
+}
+
+const COMMUNITY_DATA_FILE = path.join(process.cwd(), "data", "community-presets.json");
+
+function loadCommunityPresets(): CommunityPresetItem[] {
+  try {
+    if (fs.existsSync(COMMUNITY_DATA_FILE)) {
+      const raw = fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn("[Community] Không đọc được dữ liệu, dùng seed mặc định:", err);
+  }
+  return PRESET_LESSON_NOTES.map((p) => ({
+    ...p,
+    author: "Kho Học Liệu Mẫu",
+    likes: 0,
+    createdAt: new Date().toISOString(),
+    fromCommunity: false,
+  }));
+}
+
+function saveCommunityPresets(items: CommunityPresetItem[]) {
+  try {
+    fs.mkdirSync(path.dirname(COMMUNITY_DATA_FILE), { recursive: true });
+    fs.writeFileSync(
+      COMMUNITY_DATA_FILE,
+      JSON.stringify(items, null, 2),
+      "utf-8"
+    );
+  } catch (err) {
+    console.warn("[Community] Không lưu được dữ liệu:", err);
+  }
+}
+
+let communityPresets: CommunityPresetItem[] = loadCommunityPresets();
 
 function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -409,6 +470,79 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         error: friendlyMsg,
       });
     }
+  });
+
+  // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng)
+  app.get("/api/community/presets", (_req, res) => {
+    res.json({
+      items: communityPresets,
+      total: communityPresets.length,
+      syncedAt: new Date().toISOString(),
+    });
+  });
+
+  // API: Đóng góp bài mẫu mới vào kho chung
+  app.post("/api/community/presets", (req, res) => {
+    try {
+      const {
+        subject,
+        subjectId,
+        textbook,
+        title,
+        content,
+        style,
+        author,
+        type = "note",
+      } = req.body || {};
+
+      if (!title || !content || !subject) {
+        return res.status(400).json({
+          error: "Thiếu thông tin bài mẫu (cần có tên bài, môn học và nội dung).",
+        });
+      }
+
+      const newItem: CommunityPresetItem = {
+        id: "community-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
+        type: type === "exercise" ? "exercise" : "note",
+        title: String(title).trim(),
+        subject: String(subject).trim(),
+        subjectId: String(subjectId || "").trim(),
+        textbook: String(textbook || "Kết nối tri thức với cuộc sống").trim(),
+        content: String(content),
+        date: new Date().toLocaleDateString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }),
+        isFavorite: false,
+        style: style || "standard",
+        author: String(author || "Bạn ẩn danh").trim().slice(0, 60),
+        likes: 0,
+        createdAt: new Date().toISOString(),
+        fromCommunity: true,
+      };
+
+      communityPresets = [newItem, ...communityPresets];
+      saveCommunityPresets(communityPresets);
+
+      res.status(201).json({ item: newItem, total: communityPresets.length });
+    } catch (err: any) {
+      console.error("Error adding community preset:", err);
+      res.status(500).json({ error: "Không thể đóng góp bài mẫu. Vui lòng thử lại." });
+    }
+  });
+
+  // API: Bày tỏ thích / bỏ thích một bài mẫu
+  app.post("/api/community/presets/:id/like", (req, res) => {
+    const id = req.params.id;
+    const liked = req.body?.liked === true;
+    const item = communityPresets.find((p) => p.id === id);
+    if (!item) {
+      return res.status(404).json({ error: "Không tìm thấy bài mẫu." });
+    }
+    item.likes = liked ? item.likes + 1 : Math.max(0, item.likes - 1);
+    saveCommunityPresets(communityPresets);
+    res.json({ id, likes: item.likes });
   });
 
   // Vite middleware for development

@@ -20,7 +20,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-blue-700',
     icon: 'Calculator',
     description: 'Ứng dụng đạo hàm khảo sát hàm số, Vectơ & Oxyz, Tích phân, Xác suất có điều kiện',
-    loigiaihayUrl: 'https://loigiaihay.com/toan-lop-12-c47.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-toan-12-ket-noi-tri-thuc-c1783.html',
     popularLessons: [
       'Tính đơn điệu và cực trị của hàm số',
       'Giá trị lớn nhất và giá trị nhỏ nhất của hàm số',
@@ -99,7 +99,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-emerald-700',
     icon: 'Languages',
     description: 'Ngữ pháp nâng cao, đọc hiểu chuyên sâu, từ vựng theo chủ điểm thi THPT',
-    loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-lop-12-moi-c143.html',
+    loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-c1752.html',
     popularLessons: [
       'Unit 1: Life stories and Career paths (Câu tường thuật & Mệnh đề quan hệ)',
       'Unit 2: A multicultural world (Thì hoàn thành & Thể bị động)',
@@ -133,7 +133,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-cyan-700',
     icon: 'Atom',
     description: 'Vật lí nhiệt, Khí lí tưởng, Từ trường và Cảm ứng điện từ, Vật lí hạt nhân',
-    loigiaihayUrl: 'https://loigiaihay.com/vat-ly-lop-12-c63.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-vat-li-12-ket-noi-tri-thuc-c1732.html',
     popularLessons: [
       'Sự chuyển thể của các chất và nhiệt độ nóng chảy, nhiệt hóa hơi',
       'Định luật I của nhiệt động lực học và ứng dụng',
@@ -168,7 +168,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-purple-700',
     icon: 'FlaskConical',
     description: 'Ester - Lipid, Carbohydrate, Hợp chất chứa Nitrogen, Polymer, Pin điện hóa & Phức chất',
-    loigiaihayUrl: 'https://loigiaihay.com/hoa-hoc-lop-12-c55.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-hoa-12-ket-noi-tri-thuc-c1745.html',
     popularLessons: [
       'Ester và Lipid: Cấu tạo, tính chất hóa học và phản ứng xà phòng hóa',
       'Chất béo và acid béo Omega: Ứng dụng trong thực tiễn',
@@ -203,7 +203,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-green-700',
     icon: 'Dna',
     description: 'Cơ chế di truyền và biến dị, Quy luật di truyền Mendel, Tiến hóa và Sinh thái học',
-    loigiaihayUrl: 'https://loigiaihay.com/sinh-hoc-lop-12-c71.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-sinh-12-ket-noi-tri-thuc-c1776.html',
     popularLessons: [
       'Gen, mã di truyền và quá trình nhân đôi DNA',
       'Phiên mã, dịch mã và điều hòa hoạt động của gen (Operon Lac)',
@@ -233,7 +233,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-amber-800',
     icon: 'Hourglass',
     description: 'Thế giới từ năm 1945 đến nay, Cách mạng tháng Tám, Kháng chiến bảo vệ Tổ quốc, Đổi mới',
-    loigiaihayUrl: 'https://loigiaihay.com/lich-su-lop-12-c82.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-lich-su-12-ket-noi-tri-thuc-c1824.html',
     popularLessons: [
       'Liên Hợp Quốc: Mục tiêu, nguyên tắc hoạt động và vai trò lịch sử',
       'Trật tự thế giới hai cực Ianta và quan hệ quốc tế thời kỳ Chiến tranh lạnh',
@@ -293,7 +293,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-violet-800',
     icon: 'Scale',
     description: 'Tăng trưởng kinh tế, hội nhập quốc tế, pháp luật về quyền và nghĩa vụ công dân',
-    loigiaihayUrl: 'https://loigiaihay.com/giao-duc-kinh-te-va-phap-luat-12-ket-noi-tri-thuc-c875.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-giao-duc-kinh-te-va-phap-luat-12-ket-noi-tri-thuc-c1879.html',
     popularLessons: [
       'Tăng trưởng và phát triển kinh tế bền vững',
       'Hội nhập kinh tế quốc tế và vai trò của các tổ chức thương mại WTO, ASEAN, CPTPP',
@@ -322,7 +322,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-sky-800',
     icon: 'Laptop',
     description: 'Trí tuệ nhân tạo, Mạng máy tính & Internet, Hệ cơ sở dữ liệu quan hệ và bảo mật',
-    loigiaihayUrl: 'https://loigiaihay.com/tin-hoc-12-ket-noi-tri-thuc-c879.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-tin-hoc-12-ket-noi-tri-thuc-c1847.html',
     popularLessons: [
       'Khái quát về Trí tuệ nhân tạo (AI): Lịch sử, ứng dụng và xu thế',
       'Đạo đức và trách nhiệm xã hội khi sử dụng Trí tuệ nhân tạo',
@@ -352,7 +352,7 @@ const RAW_SUBJECTS: Omit<SubjectInfo, 'chapters'>[] = [
     accentText: 'text-stone-800',
     icon: 'Cpu',
     description: 'Hệ thống điện tử, tự động hóa vi điều khiển, công nghệ điện và nông nghiệp 4.0',
-    loigiaihayUrl: 'https://loigiaihay.com/cong-nghe-12-ket-noi-tri-thuc-c881.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-cong-nghe-12-ket-noi-tri-thuc-c1813.html',
     popularLessons: [
       'Linh kiện điện tử thụ động: Điện trở, tụ điện, cuộn cảm',
       'Linh kiện bán dẫn: Diode, Transistor, Thyristor, Triac',
