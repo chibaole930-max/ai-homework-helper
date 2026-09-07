@@ -91,6 +91,41 @@ async function ensureCommunityTable(pool: Pool) {
       "fromCommunity" BOOLEAN NOT NULL DEFAULT false
     )
   `);
+  // Nếu bảng đã tồn tại nhưng schema không khớp (ví dụ tên cột in thường
+  // không có dấu nháy khi tạo), xóa và tạo lại cho đúng chuẩn.
+  const colCheck = await pool.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='community_presets'
+       AND column_name = 'subjectId'`
+  );
+  if (colCheck.rows.length === 0) {
+    const existsCheck = await pool.query(
+      `SELECT 1 FROM information_schema.tables
+       WHERE table_schema='public' AND table_name='community_presets'`
+    );
+    if (existsCheck.rows.length > 0) {
+      await pool.query("DROP TABLE community_presets");
+      console.log("[Community] Bảng cũ chưa đúng schema, đã xóa để tạo lại.");
+    }
+  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS community_presets (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'note',
+      title TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      "subjectId" TEXT NOT NULL,
+      textbook TEXT NOT NULL,
+      content TEXT NOT NULL,
+      date TEXT,
+      "isFavorite" BOOLEAN NOT NULL DEFAULT false,
+      style TEXT,
+      author TEXT NOT NULL DEFAULT 'Kho Học Liệu Mẫu',
+      likes INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "fromCommunity" BOOLEAN NOT NULL DEFAULT false
+    )
+  `);
   const { rows } = await pool.query(
     "SELECT COUNT(*)::int AS c FROM community_presets"
   );
