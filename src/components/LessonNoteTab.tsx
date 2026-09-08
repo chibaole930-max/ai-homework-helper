@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SubjectInfo,
   SubjectId,
@@ -31,6 +31,11 @@ import {
   ExternalLink,
   Layers,
   ListChecks,
+  Share2,
+  X,
+  Loader2,
+  Send,
+  Gift,
 } from 'lucide-react';
 
 interface LessonNoteTabProps {
@@ -56,7 +61,154 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Giới hạn lượt soạn bài miễn phí (3 lần/ngày theo IP + tối đa 1 lượt từ mã chia sẻ)
+  const [usage, setUsage] = useState<{
+    limit: number;
+    bonus: number;
+    available: number;
+    used: number;
+    remaining: number;
+    shareCode: string | null;
+  } | null>(null);
+  // Chia sẻ mã nhận thêm lượt soạn bài
+  const [myShareCode, setMyShareCode] = useState<string | null>(null);
+  const [shareCodeLoading, setShareCodeLoading] = useState(false);
+  const [shareCodeMsg, setShareCodeMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [shareCodeCopied, setShareCodeCopied] = useState(false);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeeming, setRedeeeming] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Chia sẻ bài mẫu lên Kho chung
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareTitle, setShareTitle] = useState('');
+  const [shareAuthor, setShareAuthor] = useState('');
+  const [shareContent, setShareContent] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shared, setShared] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
+
+  const refreshUsage = React.useCallback(() => {
+    fetch('/api/usage/status')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setUsage(d);
+          if (d.shareCode) setMyShareCode(d.shareCode);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshUsage();
+    const timer = setInterval(refreshUsage, 60000);
+    return () => clearInterval(timer);
+  }, [refreshUsage]);
+
+  const handleCreateShareCode = async () => {
+    setShareCodeLoading(true);
+    setShareCodeMsg(null);
+    try {
+      const res = await fetch('/api/usage/share-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không tạo được mã chia sẻ.');
+      setMyShareCode(data.code);
+      setShareCodeMsg({
+        ok: true,
+        text: data.reuse
+          ? 'Bạn đã có mã chia sẻ hôm nay, mã vẫn còn hiệu lực.'
+          : 'Mã chia sẻ của bạn đã sẵn sàng! Chia sẻ để nhận +1 lượt soạn bài.',
+      });
+      refreshUsage();
+    } catch (err: any) {
+      setShareCodeMsg({ ok: false, text: err.message || 'Không tạo được mã chia sẻ.' });
+    } finally {
+      setShareCodeLoading(false);
+    }
+  };
+
+  const handleCopyShareCode = async () => {
+    if (!myShareCode) return;
+    try {
+      await navigator.clipboard.writeText(myShareCode);
+      setShareCodeCopied(true);
+      setTimeout(() => setShareCodeCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleRedeemCode = async () => {
+    if (!redeemInput.trim()) return;
+    setRedeeeming(true);
+    setRedeemMsg(null);
+    try {
+      const res = await fetch('/api/usage/redeem-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: redeemInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không nhập được mã.');
+      setRedeemMsg({ ok: true, text: data.message || 'Thành công!' });
+      setRedeemInput('');
+      refreshUsage();
+    } catch (err: any) {
+      setRedeemMsg({ ok: false, text: err.message || 'Không thể nhập mã.' });
+    } finally {
+      setRedeeeming(false);
+    }
+  };
+
+  const openShareModal = () => {
+    setShareTitle(lessonTitle.trim() || `Bài ghi ${currentSubject.shortName}`);
+    setShareContent(generatedNote);
+    setShareAuthor('');
+    setShareError(null);
+    setShared(false);
+    setShowShareModal(true);
+  };
+
+  const handleShareToLibrary = async () => {
+    if (!shareContent.trim()) {
+      setShareError('Vui lòng nhập nội dung bài mẫu.');
+      return;
+    }
+    setIsSharing(true);
+    setShareError(null);
+    try {
+      const res = await fetch('/api/community/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: currentSubject.name,
+          subjectId: currentSubject.id,
+          textbook: selectedTextbook,
+          title: shareTitle.trim(),
+          content: shareContent,
+          author: shareAuthor.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Đăng lên Kho bài mẫu thất bại.');
+      }
+      setShared(true);
+      setTimeout(() => {
+        setShowShareModal(false);
+        setShared(false);
+      }, 1300);
+    } catch (err: any) {
+      setShareError(err.message || 'Không thể đăng. Vui lòng thử lại.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   const scrollOutputIntoView = () => {
     if (window.matchMedia('(min-width: 1024px)').matches) return;
@@ -120,6 +272,15 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
 
       const data = await response.json();
       setGeneratedNote(data.result);
+      setUsage((prev) =>
+        prev
+          ? {
+              ...prev,
+              used: prev.used + 1,
+              remaining: Math.max(0, prev.available - (prev.used + 1)),
+            }
+          : prev
+      );
     } catch (err: any) {
       console.error('Error generating lesson note:', err);
       setErrorMsg(
@@ -163,6 +324,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   };
 
   const alreadySaved = isItemSaved(lessonTitle.trim(), currentSubject.name);
+  const outOfUses = usage !== null && usage.remaining <= 0;
 
   return (
     <div className="space-y-6">
@@ -182,6 +344,145 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           </p>
         </div>
         <div className="absolute right-0 -bottom-10 w-72 h-72 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+      </div>
+
+      {/* Hạn mức lượt soạn bài miễn phí hôm nay */}
+      {usage && usage.remaining > 0 && (
+        <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-indigo-50/70 border-indigo-100 text-indigo-800">
+          <span className="font-medium flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+            Soạn bài miễn phí hôm nay: còn{' '}
+            <b className="text-indigo-900">{usage.remaining}/{usage.available}</b> lượt
+            {usage.bonus >= 1 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+                +1 lượt từ chia sẻ
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+      {usage && usage.remaining <= 0 && (
+        <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-amber-50 border-amber-200 text-amber-800">
+          <span className="font-medium flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            Bạn đã dùng hết {usage.available} lượt soạn bài miễn phí hôm nay. Hạn mức sẽ reset vào ngày mai.
+          </span>
+        </div>
+      )}
+
+      {/* Chia sẻ mã nhận thêm lượt soạn bài */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+            <span className="p-1.5 rounded-lg bg-rose-100 text-rose-500">
+              <Gift className="w-4 h-4" />
+            </span>
+            Chia sẻ mã nhận thêm <span className="text-rose-600">1 lượt soạn bài</span>
+          </div>
+          {usage && usage.bonus >= 1 && (
+            <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">
+              Đã nhận +1 lượt hôm nay
+            </span>
+          )}
+        </div>
+
+        <div className="text-xs text-slate-500 leading-relaxed">
+          Nhấn <b>Tạo mã</b>, gửi mã cho bạn bè. Khi bạn bè nhập mã, bạn được cộng{' '}
+          <b>+1 lượt</b> (tối đa 1 lượt/ngày). Mỗi mã chỉ dùng được <b>1 lần</b> duy nhất.
+        </div>
+
+        {!myShareCode && !shareCodeMsg && (
+          <button
+            type="button"
+            onClick={handleCreateShareCode}
+            disabled={shareCodeLoading}
+            className="w-full sm:w-auto px-4 py-2 text-sm font-bold rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white flex items-center justify-center gap-1.5"
+          >
+            {shareCodeLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Đang tạo mã...
+              </>
+            ) : (
+              <>
+                <Gift className="w-4 h-4" />
+                Tạo mã chia sẻ của tôi
+              </>
+            )}
+          </button>
+        )}
+
+        {shareCodeMsg && !myShareCode && (
+          <div
+            className={`px-3 py-2 rounded-xl text-xs ${
+              shareCodeMsg.ok
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}
+          >
+            {shareCodeMsg.text}
+          </div>
+        )}
+
+        {myShareCode && (
+          <div className="rounded-xl border-2 border-dashed border-rose-200 bg-rose-50/60 p-3 sm:p-4 space-y-2">
+            <div className="text-[11px] text-slate-500 font-semibold">Mã chia sẻ của bạn</div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xl sm:text-2xl tracking-[0.25em] font-bold text-rose-600">
+                {myShareCode}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyShareCode}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-100 flex items-center gap-1.5"
+              >
+                {shareCodeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {shareCodeCopied ? 'Đã sao chép' : 'Sao chép'}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Không đăng mã công khai. Mã hết hiệu lực sau 48 giờ hoặc khi đã được dùng.
+            </p>
+          </div>
+        )}
+
+        <div className="border-t border-slate-100 pt-3 space-y-1.5">
+          <div className="flex gap-2">
+            <input
+              value={redeemInput}
+              onChange={(e) => setRedeemInput(e.target.value)}
+              placeholder="Nhập mã bạn bè gửi cho bạn..."
+              className="flex-1 px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none min-w-0"
+            />
+            <button
+              type="button"
+              onClick={handleRedeemCode}
+              disabled={redeeming || !redeemInput.trim()}
+              className="px-3 py-2 text-sm font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white flex items-center gap-1.5 flex-shrink-0"
+            >
+              {redeeming ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              Nhập mã
+            </button>
+          </div>
+          {redeemMsg && (
+            <div
+              className={`px-3 py-2 rounded-xl text-xs ${
+                redeemMsg.ok
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}
+            >
+              {redeemMsg.text}
+            </div>
+          )}
+          <p className="text-[11px] text-slate-400">
+            Nhập mã sẽ giúp bạn của bạn được +1 lượt soạn hôm nay. Mỗi mã chỉ tác dụng 1 lần.
+          </p>
+        </div>
       </div>
 
       {/* Main Workspace Layout */}
@@ -518,14 +819,19 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             <button
               id="btn-generate-lesson"
               type="button"
-              disabled={isLoading}
+              disabled={isLoading || outOfUses}
               onClick={() => handleGenerate()}
-              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-xl shadow-md shadow-indigo-100 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-xl shadow-md shadow-indigo-100 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>Đang tổng hợp bài ghi Lớp 12...</span>
+                </>
+              ) : outOfUses ? (
+                <>
+                  <AlertCircle className="w-4 h-4" />
+                  <span>Hết lượt soạn bài hôm nay</span>
                 </>
               ) : (
                 <>
@@ -608,6 +914,15 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                     <Printer className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">In</span>
                   </button>
+
+                  <button
+                    onClick={openShareModal}
+                    title="Đăng bài này lên Kho bài mẫu cho mọi người dùng web cùng xem"
+                    className="p-1.5 text-xs text-slate-600 hover:text-white hover:bg-emerald-600 rounded-lg border border-slate-200 flex items-center gap-1 font-medium transition-colors"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Chia sẻ lên Kho</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -669,6 +984,118 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal: Đăng bài mẫu lên Kho chung */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Share2 className="w-5 h-5" />
+                  Đăng bài mẫu lên Kho chung
+                </h2>
+                <p className="text-xs text-emerald-100 mt-0.5">
+                  Bài của bạn sẽ được đồng bộ để mọi người dùng web xem và sử dụng.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="p-1.5 rounded-lg hover:bg-white/15 text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-xs text-slate-700">
+                <div className="bg-slate-50 rounded-lg px-3 py-2">
+                  Môn học: <b className="text-slate-900">{currentSubject.name}</b>
+                </div>
+                <div className="bg-slate-50 rounded-lg px-3 py-2">
+                  Bộ sách: <b className="text-slate-900">{selectedTextbook}</b>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">Tên bài mẫu *</label>
+                <input
+                  value={shareTitle}
+                  onChange={(e) => setShareTitle(e.target.value)}
+                  placeholder="VD: Bài 1: Vị trí địa lí và phạm vi lãnh thổ"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">
+                  Tên của bạn (không bắt buộc)
+                </label>
+                <input
+                  value={shareAuthor}
+                  onChange={(e) => setShareAuthor(e.target.value)}
+                  placeholder="VD: Minh Anh - 12A1"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">
+                  Nội dung bài mẫu (Markdown) *
+                </label>
+                <textarea
+                  value={shareContent}
+                  onChange={(e) => setShareContent(e.target.value)}
+                  rows={9}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none font-mono leading-relaxed"
+                />
+              </div>
+
+              {shareError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                  {shareError}
+                </div>
+              )}
+              {shared && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-semibold">
+                  Đã đăng! Bài mẫu của bạn đã có trong Kho bài mẫu chung.
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl hover:bg-slate-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleShareToLibrary}
+                disabled={isSharing || shared}
+                className="px-4 py-2 text-sm font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white flex items-center gap-1.5"
+              >
+                {isSharing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang đăng...
+                  </>
+                ) : shared ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Đã đăng
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Đăng lên Kho Bài Mẫu
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

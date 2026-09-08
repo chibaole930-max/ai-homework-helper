@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { Pool } from "pg";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
@@ -370,9 +371,218 @@ async function generateContentWithFallback(
   throw lastError || new Error("Không thể kết nối đến mô hình AI sau khi đã thử các phương án dự phòng.");
 }
 
+// ---------------------------------------------------------------------------
+// GIỚI HẠN SỐ LẦN SOẠN BÀI MIỄN PHÍ (3 lượt/ngày tính theo IP)
+// ---------------------------------------------------------------------------
+
+const USAGE_LIMIT_PER_DAY = 3;
+const USAGE_DATA_FILE = path.join(process.cwd(), "data", "usage.json");
+
+function usageKey(req: express.Request): string {
+  const date = new Date().toISOString().slice(0, 10);
+  return `${date}|${req.ip || "unknown"}`;
+}
+
+async function readUsageCount(key: string): Promise<number> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query(
+        "SELECT count FROM usage_daily WHERE usage_key = $1",
+        [key]
+      );
+      return rows.length ? Number(rows[0].count) : 0;
+    } catch (err) {
+      console.warn("[Usage] Không đọc được PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(USAGE_DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(USAGE_DATA_FILE, "utf-8"));
+      return Number(parsed[key] || 0);
+    }
+  } catch {
+    // ignore
+  }
+  return 0;
+}
+
+async function incrementUsage(key: string): Promise<number> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query(
+        `INSERT INTO usage_daily (usage_key, count)
+         VALUES ($1, 1)
+         ON CONFLICT (usage_key) DO UPDATE SET count = usage_daily.count + 1
+         RETURNING count`,
+        [key]
+      );
+      return Number(rows[0].count);
+    } catch (err) {
+      console.warn("[Usage] Không ghi được PostgreSQL:", err);
+    }
+  }
+  let store: Record<string, number> = {};
+  try {
+    if (fs.existsSync(USAGE_DATA_FILE)) {
+      store = JSON.parse(fs.readFileSync(USAGE_DATA_FILE, "utf-8"));
+    }
+  } catch {
+    store = {};
+  }
+  if (typeof store !== "object" || !store) store = {};
+  store[key] = Number(store[key] || 0) + 1;
+  try {
+    fs.mkdirSync(path.dirname(USAGE_DATA_FILE), { recursive: true });
+    fs.writeFileSync(USAGE_DATA_FILE, JSON.stringify(store, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Usage] Không lưu được file:", err);
+  }
+  return store[key];
+}
+
+async function ensureUsageTable(pool: Pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usage_daily (
+      usage_key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS share_codes (
+      code TEXT PRIMARY KEY,
+      sharer_key TEXT NOT NULL,
+      created_by_ip TEXT NOT NULL,
+      created_date TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      redeemed BOOLEAN NOT NULL DEFAULT FALSE,
+      redeemed_by_ip TEXT
+    )
+  `);
+}
+
+// ---------------------------------------------------------------------------
+// MÃ CHIA SẺ NHẬN THÊM LƯỢT SOẠN BÀI (tối đa +1 lượt/ngày, chống gian lận nâng cao)
+// Quy tắc chống gian lận:
+// - Mỗi mã chỉ dùng được ĐÚNG 1 LẦN duy nhất trên toàn hệ thống (single-use).
+// - Không cho nhập mã do chính IP của mình tạo ra (chặn tự rút lượt).
+// - Mỗi người chia sẻ chỉ nhận tối đa +1 lượt/ngày (bonus_grant|date|ip).
+// - Giới hạn số mã được tạo/ngày/IP (5) và số lần thử tạo/nhập mã/ngày (10 & 15)
+//   để chặn kịch bản quét mã tự động (brute force).
+// - Mã hết hạn sau 48 giờ kể từ khi tạo.
+// ---------------------------------------------------------------------------
+
+const SHARE_TTL_MS = 48 * 60 * 60 * 1000;
+const MAX_SHARE_CODES_PER_DAY = 5;
+const MAX_SHARE_CREATE_ATTEMPTS_PER_DAY = 10;
+const MAX_REDEEM_ATTEMPTS_PER_DAY = 15;
+
+const SHARE_CODES_FILE = path.join(process.cwd(), "data", "share-codes.json");
+
+interface ShareCodeRecord {
+  code: string;
+  sharerKey: string;
+  createdByIp: string;
+  createdDate: string;
+  createdAt: string;
+  redeemed: boolean;
+  redeemedByIp: string | null;
+}
+
+async function readShareCodes(): Promise<Record<string, ShareCodeRecord>> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query(
+        `SELECT code, sharer_key, created_by_ip, created_date, created_at, redeemed, redeemed_by_ip
+         FROM share_codes`
+      );
+      const map: Record<string, ShareCodeRecord> = {};
+      for (const r of rows) {
+        map[r.code] = {
+          code: r.code,
+          sharerKey: r.sharer_key,
+          createdByIp: r.created_by_ip,
+          createdDate: r.created_date,
+          createdAt: r.created_at,
+          redeemed: !!r.redeemed,
+          redeemedByIp: r.redeemed_by_ip,
+        };
+      }
+      return map;
+    } catch (err) {
+      console.warn("[Share] Không đọc được PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(SHARE_CODES_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(SHARE_CODES_FILE, "utf-8"));
+      return typeof parsed === "object" && parsed ? parsed : {};
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+async function writeShareCodes(map: Record<string, ShareCodeRecord>) {
+  if (pgPool) {
+    try {
+      for (const rec of Object.values(map)) {
+        await pgPool.query(
+          `INSERT INTO share_codes (code, sharer_key, created_by_ip, created_date, created_at, redeemed, redeemed_by_ip)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (code) DO UPDATE SET
+             redeemed = EXCLUDED.redeemed,
+             redeemed_by_ip = EXCLUDED.redeemed_by_ip`,
+          [
+            rec.code,
+            rec.sharerKey,
+            rec.createdByIp,
+            rec.createdDate,
+            rec.createdAt,
+            rec.redeemed,
+            rec.redeemedByIp,
+          ]
+        );
+      }
+    } catch (err) {
+      console.warn("[Share] Không ghi được PostgreSQL:", err);
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(SHARE_CODES_FILE), { recursive: true });
+    fs.writeFileSync(SHARE_CODES_FILE, JSON.stringify(map, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Share] Không lưu được file:", err);
+  }
+}
+
+async function findActiveShareCodeForIp(ip: string): Promise<ShareCodeRecord | null> {
+  const store = await readShareCodes();
+  const now = Date.now();
+  for (const rec of Object.values(store)) {
+    if (
+      rec.createdByIp === ip &&
+      !rec.redeemed &&
+      now - new Date(rec.createdAt).getTime() < SHARE_TTL_MS
+    ) {
+      return rec;
+    }
+  }
+  return null;
+}
+
+if (pgPool) {
+  ensureUsageTable(pgPool).catch((err) => {
+    console.error("[Usage] Lỗi khởi tạo bảng usage_daily:", err);
+  });
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Render chạy sau proxy CDN/LB nên bật trust proxy để lấy đúng IP người dùng
+  app.set("trust proxy", true);
 
   // Increase payload limit for base64 image uploads of homework photos
   app.use(express.json({ limit: "25mb" }));
@@ -381,6 +591,137 @@ async function startServer() {
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // API: Trạng thái lượt soạn bài miễn phí hôm nay (theo IP)
+  app.get("/api/usage/status", async (req, res) => {
+    try {
+      const key = usageKey(req);
+      const used = await readUsageCount(key);
+      const bonus = await readUsageCount(`bonus_grant|${key}`);
+      const available = USAGE_LIMIT_PER_DAY + Math.min(1, bonus);
+      const activeShare = await findActiveShareCodeForIp(req.ip || "unknown");
+      res.json({
+        limit: USAGE_LIMIT_PER_DAY,
+        bonus,
+        available,
+        used,
+        remaining: Math.max(0, available - used),
+        date: new Date().toISOString().slice(0, 10),
+        shareCode: activeShare ? activeShare.code : null,
+      });
+    } catch (err: any) {
+      console.error("Error reading usage:", err);
+      res.status(500).json({ error: "Không đọc được trạng thái lượt soạn bài." });
+    }
+  });
+
+  // API: Tạo mã chia sẻ để nhận thêm lượt soạn bài (tối đa +1/ngày)
+  app.post("/api/usage/share-code", async (req, res) => {
+    try {
+      const ip = req.ip || "unknown";
+      const key = usageKey(req);
+
+      const attemptCount = await incrementUsage(`share_attempt|${key}`);
+      if (attemptCount > MAX_SHARE_CREATE_ATTEMPTS_PER_DAY) {
+        return res.status(429).json({
+          error: "Bạn đã thử tạo mã quá nhiều lần hôm nay. Vui lòng thử lại vào ngày mai.",
+        });
+      }
+
+      const activeShare = await findActiveShareCodeForIp(ip);
+      if (activeShare) {
+        return res.json({ code: activeShare.code, reuse: true });
+      }
+
+      const createdCount = await readUsageCount(`share_created|${key}`);
+      if (createdCount >= MAX_SHARE_CODES_PER_DAY) {
+        return res.status(429).json({
+          error: `Bạn đã tạo tối đa ${MAX_SHARE_CODES_PER_DAY} mã chia sẻ hôm nay.`,
+        });
+      }
+
+      const code = crypto.randomBytes(6).toString("hex").toUpperCase();
+      const store = await readShareCodes();
+      store[code] = {
+        code,
+        sharerKey: key,
+        createdByIp: ip,
+        createdDate: new Date().toISOString().slice(0, 10),
+        createdAt: new Date().toISOString(),
+        redeemed: false,
+        redeemedByIp: null,
+      };
+      await writeShareCodes(store);
+      await incrementUsage(`share_created|${key}`);
+
+      res.json({ code, reuse: false });
+    } catch (err: any) {
+      console.error("Error creating share code:", err);
+      res.status(500).json({ error: "Không tạo được mã chia sẻ." });
+    }
+  });
+
+  // API: Nhập mã chia sẻ từ bạn bè (giúp người chia sẻ nhận +1 lượt, mã single-use)
+  app.post("/api/usage/redeem-code", async (req, res) => {
+    try {
+      const { code } = req.body || {};
+      const ip = req.ip || "unknown";
+      const key = usageKey(req);
+
+      if (!code || typeof code !== "string" || !/^[A-Z0-9]{12}$/.test(code.trim().toUpperCase())) {
+        return res.status(400).json({ error: "Mã chia sẻ không đúng định dạng." });
+      }
+      const normalized = code.trim().toUpperCase();
+
+      const attemptCount = await incrementUsage(`redeem_attempt|${key}`);
+      if (attemptCount > MAX_REDEEM_ATTEMPTS_PER_DAY) {
+        return res.status(429).json({
+          error: "Bạn đã thử nhập mã quá nhiều lần hôm nay. Vui lòng thử lại vào ngày mai.",
+        });
+      }
+
+      const store = await readShareCodes();
+      const rec = store[normalized];
+      if (!rec) {
+        await incrementUsage(`redeem_fail|${key}`);
+        return res.status(404).json({ error: "Mã chia sẻ không tồn tại." });
+      }
+      if (rec.redeemed) {
+        await incrementUsage(`redeem_fail|${key}`);
+        return res.status(400).json({ error: "Mã này đã được sử dụng rồi." });
+      }
+      if (rec.createdByIp === ip) {
+        await incrementUsage(`redeem_fail|${key}`);
+        return res.status(400).json({ error: "Bạn không thể nhập mã chính mình tạo ra." });
+      }
+      if (Date.now() - new Date(rec.createdAt).getTime() > SHARE_TTL_MS) {
+        await incrementUsage(`redeem_fail|${key}`);
+        return res.status(400).json({ error: "Mã đã hết hạn sử dụng." });
+      }
+
+      rec.redeemed = true;
+      rec.redeemedByIp = ip;
+      await writeShareCodes(store);
+
+      const bonusKey = `bonus_grant|${rec.sharerKey}`;
+      const alreadyBonus = await readUsageCount(bonusKey);
+      if (alreadyBonus >= 1) {
+        return res.json({
+          success: true,
+          message: "Mã hợp lệ! Người chia sẻ hôm nay đã nhận đủ lượt thưởng rồi.",
+        });
+      }
+
+      await incrementUsage(bonusKey);
+      res.json({
+        success: true,
+        message: "Thành công! Nhờ bạn, người chia sẻ vừa nhận thêm 1 lượt soạn bài miễn phí hôm nay.",
+      });
+    } catch (err: any) {
+      console.error("Error redeeming share code:", err);
+      res.status(500).json({ error: "Không xử lý được mã chia sẻ." });
+    }
   });
 
   // API: Soạn bài ghi Lớp 12 (Bám sát nguồn & phong cách Lời Giải Hay - loigiaihay.com)
@@ -398,6 +739,18 @@ async function startServer() {
 
       if (!subject || !lessonTitle) {
         return res.status(400).json({ error: "Thiếu thông tin môn học hoặc tên bài học." });
+      }
+
+      // Giới hạn lượt soạn bài miễn phí: 3 lượt/ngày theo IP (+ tối đa 1 lượt từ mã chia sẻ)
+      const usageKeyForReq = usageKey(req);
+      const used = await readUsageCount(usageKeyForReq);
+      const bonus = await readUsageCount(`bonus_grant|${usageKeyForReq}`);
+      const availableLimit = USAGE_LIMIT_PER_DAY + Math.min(1, bonus);
+      if (used >= availableLimit) {
+        return res.status(429).json({
+          error: `Bạn đã dùng hết ${availableLimit} lượt soạn bài miễn phí hôm nay. Hạn mức sẽ tự reset vào ngày mai.`,
+          usage: { limit: USAGE_LIMIT_PER_DAY, available: availableLimit, used, remaining: 0 },
+        });
       }
 
       const ai = getGeminiClient();
@@ -498,6 +851,7 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
       });
 
       const content = response.text || "Không tạo được nội dung bài học. Vui lòng thử lại.";
+      await incrementUsage(usageKeyForReq);
       res.json({ result: content });
     } catch (err: any) {
       console.error("Error generating lesson note:", err);
