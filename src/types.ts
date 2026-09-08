@@ -11,6 +11,8 @@ export type SubjectId =
   | 'tin'
   | 'congnghe';
 
+export type GradeId = '10' | '11' | '12';
+
 export type TextbookSeries =
   | 'Kết nối tri thức với cuộc sống'
   | 'Cánh diều'

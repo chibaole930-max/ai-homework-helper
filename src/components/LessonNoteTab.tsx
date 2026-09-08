@@ -7,8 +7,8 @@ import {
   DetailLevel,
   SavedStudyItem,
   LoigiaihaySection,
+  GradeId,
 } from '../types';
-import { SUBJECTS, TEXTBOOKS } from '../data/subjects';
 import { SubjectIcon } from './SubjectIcon';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { CurriculumBrowser } from './CurriculumBrowser';
@@ -40,16 +40,26 @@ import {
 interface LessonNoteTabProps {
   onSaveNote: (item: Omit<SavedStudyItem, 'id' | 'date'>) => void;
   isItemSaved: (title: string, subject: string) => boolean;
+  subjects: SubjectInfo[];
+  textbooks: TextbookSeries[];
+  gradeLabel: string;
+  grade: GradeId;
 }
 
 export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   onSaveNote,
   isItemSaved,
+  subjects,
+  textbooks,
+  gradeLabel,
+  grade,
 }) => {
-  const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>('dia');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>(() =>
+    (subjects[0]?.id as SubjectId) || 'dia'
+  );
   const [selectedTextbook, setSelectedTextbook] =
     useState<TextbookSeries>('Kết nối tri thức với cuộc sống');
-  const [lessonTitle, setLessonTitle] = useState('Bài 1: Vị trí địa lí và phạm vi lãnh thổ');
+  const [lessonTitle, setLessonTitle] = useState('');
   const [noteStyle, setNoteStyle] = useState<NoteStyle>('loigiaihay_full');
   const [loigiaihaySection, setLoigiaihaySection] =
     useState<LoigiaihaySection>('all');
@@ -112,6 +122,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           title: shareTitle.trim(),
           content: shareContent,
           author: shareAuthor.trim(),
+          grade,
         }),
       });
       if (!res.ok) {
@@ -136,11 +147,26 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   };
 
   const currentSubject =
-    SUBJECTS.find((s) => s.id === selectedSubjectId) || SUBJECTS[0];
+    subjects.find((s) => s.id === selectedSubjectId) || subjects[0];
+
+  useEffect(() => {
+    if (lessonTitle === '' && currentSubject) {
+      if (currentSubject.chapters && currentSubject.chapters.length > 0 && currentSubject.chapters[0].lessons.length > 0) {
+        const firstLesson = currentSubject.chapters[0].lessons[0];
+        const title = firstLesson.number
+          ? `${firstLesson.number}: ${firstLesson.title}`
+          : firstLesson.title;
+        setLessonTitle(title);
+      } else if (currentSubject.popularLessons && currentSubject.popularLessons.length > 0) {
+        setLessonTitle(currentSubject.popularLessons[0]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubjectSelect = (newSubjectId: SubjectId) => {
     setSelectedSubjectId(newSubjectId);
-    const sub = SUBJECTS.find((s) => s.id === newSubjectId);
+    const sub = subjects.find((s) => s.id === newSubjectId);
     if (sub?.chapters && sub.chapters.length > 0 && sub.chapters[0].lessons.length > 0) {
       const firstLesson = sub.chapters[0].lessons[0];
       const title = firstLesson.number
@@ -176,6 +202,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         },
         body: JSON.stringify({
           subject: currentSubject.name,
+          subjectId: currentSubject.id,
           textbook: selectedTextbook,
           lessonTitle: activeTitle,
           noteStyle,
@@ -183,6 +210,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           detailLevel,
           customNote: customNote.trim(),
           sourceUrl: currentSubject.loigiaihayUrl || '',
+          grade,
         }),
       });
 
@@ -254,13 +282,13 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-indigo-100 text-xs font-semibold backdrop-blur-xs mb-3">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Trợ Lý Soạn Bài AI Chuyên Sâu Lớp 12</span>
+            <span>Trợ Lý Soạn Bài AI Chuyên Sâu {gradeLabel}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Soạn Bài Ghi & Tổng Hợp Kiến Thức Trọng Tâm
           </h1>
           <p className="text-indigo-100 text-sm sm:text-base leading-relaxed">
-            Chuẩn hóa bài ghi vở cho tất cả 11 môn học Lớp 12 theo chương trình GDPT 2018 mới nhất.
+            Chuẩn hóa bài ghi vở cho tất cả 11 môn học {gradeLabel} theo chương trình GDPT 2018 mới nhất.
             Hỗ trợ vẽ sơ đồ tư duy, tóm lược công thức cốt lõi và câu hỏi ôn thi THPT Quốc gia.
           </p>
         </div>
@@ -297,7 +325,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
                   1
                 </span>
-                Chọn Môn Học Lớp 12
+                Chọn Môn Học {gradeLabel}
               </label>
               <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
                 11 Môn học
@@ -305,7 +333,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             </div>
 
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {SUBJECTS.map((subject) => {
+              {subjects.map((subject) => {
                 const isSelected = subject.id === selectedSubjectId;
                 return (
                   <button
@@ -367,7 +395,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {TEXTBOOKS.map((tb) => (
+              {textbooks.map((tb) => (
                 <button
                   key={tb}
                   onClick={() => setSelectedTextbook(tb)}
@@ -627,7 +655,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Đang tổng hợp bài ghi Lớp 12...</span>
+                  <span>Đang tổng hợp bài ghi {gradeLabel}...</span>
                 </>
               ) : outOfUses ? (
                 <>
@@ -739,7 +767,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-800 text-base">
-                      Đang soạn bài {currentSubject.shortName} Lớp 12
+                      Đang soạn bài {currentSubject.shortName} {gradeLabel}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm">
                       Tổng hợp cấu trúc chuẩn GDPT 2018, trích lọc công thức và câu hỏi củng cố...

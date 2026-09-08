@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PRESET_LESSON_NOTES } from '../data/presets';
-import { SUBJECTS } from '../data/subjects';
-import { SavedStudyItem, SubjectId } from '../types';
+import { SavedStudyItem, SubjectId, SubjectInfo, GradeId } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import {
   Library,
@@ -30,11 +29,17 @@ interface CommunityPreset extends SavedStudyItem {
 interface PresetLibraryTabProps {
   onImportPreset: (item: SavedStudyItem) => void;
   isItemSaved: (title: string, subject: string) => boolean;
+  subjects: SubjectInfo[];
+  gradeLabel: string;
+  grade: GradeId;
 }
 
 export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
   onImportPreset,
   isItemSaved,
+  subjects,
+  gradeLabel,
+  grade,
 }) => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [activeItem, setActiveItem] = useState<CommunityPreset | null>(null);
@@ -143,7 +148,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
 
     setSubmitting(true);
     try {
-      const subject = SUBJECTS.find((s) => s.id === contributeForm.subjectId);
+      const subject = subjects.find((s) => s.id === contributeForm.subjectId);
       const res = await fetch('/api/community/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,6 +159,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
           title: contributeForm.title,
           content: contributeForm.content,
           author: contributeForm.author,
+          grade,
         }),
       });
       if (!res.ok) {
@@ -177,7 +183,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     }
   };
 
-  const contributeSelectedSubjectName = SUBJECTS.find(
+  const contributeSelectedSubjectName = subjects.find(
     (s) => s.id === contributeForm.subjectId
   )?.name;
 
@@ -191,7 +197,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
             <span>Kho Học Liệu Mẫu Chuẩn GDPT 2018 - Đồng bộ cộng đồng</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
-            Thư Viện Bài Soạn & Lời Giải Mẫu Lớp 12
+            Thư Viện Bài Soạn & Lời Giải Mẫu {gradeLabel} (dùng chung cả 3 khối)
           </h1>
           <p className="text-emerald-100 text-sm sm:text-base leading-relaxed">
             Kho bài mẫu dùng chung cho tất cả mọi người sử dụng web! Bạn có thể đọc ngay,
@@ -239,7 +245,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
           >
             Tất cả các môn
           </button>
-          {SUBJECTS.map((s) => (
+          {subjects.map((s) => (
             <button
               key={s.id}
               onClick={() => setSelectedSubject(s.id)}
@@ -475,7 +481,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
                     }
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none"
                   >
-                    {SUBJECTS.map((s) => (
+                    {subjects.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>

@@ -10,9 +10,9 @@ import { ExerciseSolverTab } from './components/ExerciseSolverTab';
 import { SavedNotesTab } from './components/SavedNotesTab';
 import { PresetLibraryTab } from './components/PresetLibraryTab';
 import AdminTab from './components/AdminTab';
-import { SavedStudyItem } from './types';
+import { SavedStudyItem, GradeId } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
-import { SUBJECTS } from './data/subjects';
+import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
 import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, X, Wrench } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
@@ -25,11 +25,27 @@ interface SiteStatus {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('notes');
+  const [grade, setGrade] = useState<GradeId>('12');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(
     () => window.location.hash === '#/admin'
   );
   const [siteStatus, setSiteStatus] = useState<SiteStatus | null>(null);
+
+  useEffect(() => {
+    const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
+    if (savedGrade === '10' || savedGrade === '11' || savedGrade === '12') {
+      setGrade(savedGrade);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('selected_grade', grade);
+  }, [grade]);
+
+  const subjects = SUBJECTS_BY_GRADE[grade];
+  const textbooks = TEXTBOOKS_BY_GRADE[grade];
+  const gradeLabel = GRADE_LABELS[grade];
 
   useEffect(() => {
     const onHash = () => setIsAdmin(window.location.hash === '#/admin');
@@ -186,6 +202,8 @@ export default function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           savedCount={savedItems.length}
+          grade={grade}
+          onGradeChange={setGrade}
         />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
@@ -212,6 +230,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         savedCount={savedItems.length}
+        grade={grade}
+        onGradeChange={setGrade}
       />
 
       {/* Main Content Area */}
@@ -234,6 +254,10 @@ export default function App() {
           <LessonNoteTab
             onSaveNote={handleSaveItem}
             isItemSaved={isItemSaved}
+            subjects={subjects}
+            textbooks={textbooks}
+            gradeLabel={gradeLabel}
+            grade={grade}
           />
         )}
 
@@ -241,6 +265,9 @@ export default function App() {
           <ExerciseSolverTab
             onSaveExercise={handleSaveItem}
             isItemSaved={isItemSaved}
+            subjects={subjects}
+            gradeLabel={gradeLabel}
+            grade={grade}
           />
         )}
 
@@ -248,6 +275,9 @@ export default function App() {
           <PresetLibraryTab
             onImportPreset={handleImportPreset}
             isItemSaved={isItemSaved}
+            subjects={subjects}
+            gradeLabel={gradeLabel}
+            grade={grade}
           />
         )}
 
@@ -257,6 +287,8 @@ export default function App() {
             onToggleFavorite={handleToggleFavorite}
             onDeleteItem={handleDeleteItem}
             onClearAll={handleClearAll}
+            subjects={subjects}
+            gradeLabel={gradeLabel}
           />
         )}
       </main>
@@ -274,13 +306,13 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-slate-700 font-semibold">
             <GraduationCap className="w-4 h-4 text-indigo-600" />
-            <span>Học Tập Lớp 12 - Chương Trình GDPT 2018 Toàn Diện</span>
+            <span>Học Tập {gradeLabel} - Chương Trình GDPT 2018 Toàn Diện</span>
           </div>
 
           <div className="flex items-center flex-wrap justify-center gap-2 text-[11px] text-slate-500">
-            {SUBJECTS.slice(0, 7).map((s) => (
+            {subjects.slice(0, 7).map((s) => (
               <span key={s.id} className="bg-slate-100 px-2 py-0.5 rounded-md">
-                {s.shortName} 12
+                {s.shortName} {grade}
               </span>
             ))}
             <span className="text-slate-400">+ 4 môn khác</span>

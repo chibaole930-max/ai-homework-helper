@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { SavedStudyItem, SubjectId } from '../types';
-import { SUBJECTS } from '../data/subjects';
+import { SavedStudyItem, SubjectInfo } from '../types';
 import { SubjectIcon } from './SubjectIcon';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import {
@@ -24,6 +23,8 @@ interface SavedNotesTabProps {
   onToggleFavorite: (id: string) => void;
   onDeleteItem: (id: string) => void;
   onClearAll: () => void;
+  subjects: SubjectInfo[];
+  gradeLabel: string;
 }
 
 export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
@@ -31,6 +32,8 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
   onToggleFavorite,
   onDeleteItem,
   onClearAll,
+  subjects,
+  gradeLabel,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'note' | 'exercise' | 'favorite'>('all');
@@ -66,7 +69,7 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(items, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `vo_ghi_lop12_${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute('download', `vo_ghi_dien_tu_${new Date().toISOString().slice(0, 10)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -84,7 +87,7 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Lưu trữ tự động các bài học đã soạn và bài tập đã giải để ôn tập mọi lúc, mọi nơi
+            Lưu trữ tự động các bài học đã soạn và bài tập đã giải cho {gradeLabel} để ôn tập mọi lúc, mọi nơi
           </p>
         </div>
 
@@ -192,7 +195,7 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
           >
             Tất cả
           </button>
-          {SUBJECTS.map((s) => (
+          {subjects.map((s) => (
             <button
               key={s.id}
               onClick={() => setFilterSubject(s.id)}
@@ -223,7 +226,6 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredItems.map((item) => {
-            const subjectObj = SUBJECTS.find((s) => s.id === item.subjectId);
             return (
               <div
                 key={item.id}

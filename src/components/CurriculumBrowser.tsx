@@ -118,13 +118,8 @@ export const CurriculumBrowser: React.FC<CurriculumBrowserProps> = ({
     return current === formatted || (title && current.includes(title.toLowerCase()));
   };
 
-  // Specific loigiaihay URL logic
-  const loigiaihayUrl = useMemo(() => {
-    if (selectedSubject.id === 'dia') {
-      return 'https://loigiaihay.com/sgk-dia-li-lop-12-ket-noi-tri-thuc-c1859.html';
-    }
-    return selectedSubject.loigiaihayUrl;
-  }, [selectedSubject]);
+  // Per-subject link to the loigiaihay page for the current grade
+  const loigiaihayUrl = selectedSubject.loigiaihayUrl;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">

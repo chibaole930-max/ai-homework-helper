@@ -7,7 +7,6 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { PRESET_LESSON_NOTES } from "./src/data/presets";
-import { SUBJECTS } from "./src/data/subjects";
 
 dotenv.config();
 
@@ -1162,6 +1161,7 @@ async function startServer() {
     try {
       const {
         subject,
+        subjectId,
         textbook,
         lessonTitle,
         noteStyle = "loigiaihay_full",
@@ -1169,7 +1169,10 @@ async function startServer() {
         detailLevel = "standard",
         customNote = "",
         sourceUrl = "",
+        grade,
       } = req.body;
+
+      const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
 
       if (!subject || !lessonTitle) {
         return res.status(400).json({ error: "Thiếu thông tin môn học hoặc tên bài học." });
@@ -1193,7 +1196,7 @@ async function startServer() {
 
       const ai = getGeminiClient();
 
-      const systemInstruction = `Bạn là chuyên gia sư phạm THPT hàng đầu Việt Nam, bám sát hệ thống học liệu và phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com) dành cho học sinh Lớp 12 theo Chương trình Giáo dục Phổ thông mới (GDPT 2018 - bộ sách Kết nối tri thức với cuộc sống, Cánh diều, Chân trời sáng tạo) và định hướng thi Tốt nghiệp THPT & Đánh giá năng lực.
+      const systemInstruction = `Bạn là chuyên gia sư phạm THPT hàng đầu Việt Nam, bám sát hệ thống học liệu và phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com) dành cho học sinh ${gradeLabel} theo Chương trình Giáo dục Phổ thông mới (GDPT 2018 - bộ sách Kết nối tri thức với cuộc sống, Cánh diều, Chân trời sáng tạo) và định hướng thi Tốt nghiệp THPT & Đánh giá năng lực.
 Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
 - Bám sát chặt chẽ sách giáo khoa (SGK) và sách bài tập (SBT) của từng bộ sách.
 - Trình bày bài học rõ ràng, sư phạm, chuẩn mực. Mỗi mục câu hỏi luôn có cấu trúc:
@@ -1266,8 +1269,9 @@ Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
         sectionFilter = "\n[YÊU CẦU ĐẶC BIỆT: Tập trung giải trọn vẹn BÀI TẬP TRONG SÁCH BÀI TẬP (SBT)]";
       }
 
-      const prompt = `YÊU CẦU SOẠN BÀI LỚP 12 THEO NGUỒN VÀ CHUẨN LỜI GIẢI HAY (loigiaihay.com):
+      const prompt = `YÊU CẦU SOẠN BÀI ${gradeLabel.toUpperCase()} THEO NGUỒN VÀ CHUẨN LỜI GIẢI HAY (loigiaihay.com):
 - Môn học: ${subject}
+- Khối lớp: ${gradeLabel}
 - Bộ sách giáo khoa: ${textbook || "Kết nối tri thức với cuộc sống"}
 - Nguồn chính thức bám sát (trang chủ môn học trên loigiaihay.com): ${sourceUrl || "https://loigiaihay.com/"}
 - Tên bài học / Chủ đề: "${lessonTitle}"
@@ -1296,15 +1300,12 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
       // Tự động đề xuất bài mẫu chờ admin duyệt (không làm hỏng response nếu lỗi)
       if (content.length > 50 && content !== "Không tạo được nội dung bài học. Vui lòng thử lại.") {
         try {
-          const found = SUBJECTS.find(
-            (s: any) => s.name === subject || s.id === req.body.subjectId
-          );
           await insertPendingPreset({
             id: "pending-auto-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
             type: "note",
             title: String(lessonTitle).trim().slice(0, 150),
             subject: String(subject).trim(),
-            subjectId: String(found?.id || req.body.subjectId || "").trim(),
+            subjectId: String(subjectId || "").trim(),
             textbook: textbook ? String(textbook).trim() : "Kết nối tri thức với cuộc sống",
             content: content.slice(0, 20000),
             date: new Date().toLocaleDateString("vi-VN", {
@@ -1344,7 +1345,10 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
         problemType = "auto",
         solutionDepth = "detailed",
         sourceUrl = "",
+        grade,
       } = req.body;
+
+      const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
 
       if (!problemText && !imageBase64) {
         return res.status(400).json({ error: "Vui lòng nhập đề bài hoặc tải ảnh chụp bài tập." });
@@ -1358,7 +1362,7 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
 
       const ai = getGeminiClient();
 
-      const systemInstruction = `Bạn là chuyên gia giải bài tập và gia sư hàng đầu theo chuẩn học liệu Lời Giải Hay (loigiaihay.com) cho học sinh Lớp 12 tại Việt Nam.
+      const systemInstruction = `Bạn là chuyên gia giải bài tập và gia sư hàng đầu theo chuẩn học liệu Lời Giải Hay (loigiaihay.com) cho học sinh ${gradeLabel} tại Việt Nam.
 Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT) phải tuân thủ chuẩn mực sư phạm của Lời Giải Hay:
 - Văn phong: Mạch lạc, chuẩn mực, ân cần, định hướng tư duy tự học.
 - Cấu trúc lời giải chuẩn mực 5 bước của Lời Giải Hay:
@@ -1388,8 +1392,9 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
       }
 
       const promptTextParts: string[] = [
-        `YÊU CẦU GIẢI BÀI TẬP LỚP 12 THEO CHUẨN LỜI GIẢI HAY (loigiaihay.com):`,
+        `YÊU CẦU GIẢI BÀI TẬP ${gradeLabel.toUpperCase()} THEO CHUẨN LỜI GIẢI HAY (loigiaihay.com):`,
         `- Môn học: ${subject || "Tự động nhận diện"}`,
+        `- Khối lớp: ${gradeLabel}`,
         textbook ? `- Bộ sách: ${textbook}` : "",
         sourceUrl
           ? `- Nguồn chính thức bám sát (trang chủ môn học trên loigiaihay.com): ${sourceUrl}`
@@ -1452,18 +1457,21 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
   // API: Hỏi đáp mở rộng với Gia Sư AI về lời giải vừa có
   app.post("/api/tutor-followup", async (req, res) => {
     try {
-      const { subject, originalProblem, solution, userQuestion } = req.body;
+      const { subject, originalProblem, solution, userQuestion, grade } = req.body;
 
       if (!userQuestion) {
         return res.status(400).json({ error: "Thiếu câu hỏi thắc mắc." });
       }
 
+      const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
+
       const ai = getGeminiClient();
 
-      const systemInstruction = `Bạn là gia sư hỗ trợ học tập Lớp 12. Học sinh đang xem lời giải của một bài tập và có thắc mắc thêm. Hãy trả lời thật dễ hiểu, kiên nhẫn, phân tích đúng trọng tâm câu hỏi của học sinh, đưa ra ví dụ trực quan nếu cần.`;
+      const systemInstruction = `Bạn là gia sư hỗ trợ học tập ${gradeLabel}. Học sinh đang xem lời giải của một bài tập và có thắc mắc thêm. Hãy trả lời thật dễ hiểu, kiên nhẫn, phân tích đúng trọng tâm câu hỏi của học sinh, đưa ra ví dụ trực quan nếu cần.`;
 
       const prompt = `BỐI CẢNH BÀI TẬP:
-- Môn: ${subject || "Lớp 12"}
+- Môn: ${subject || gradeLabel}
+- Khối lớp: ${gradeLabel}
 - Đề bài gốc: ${originalProblem ? `"${originalProblem.slice(0, 1000)}"` : "(Hình ảnh / Đề bài trước)"}
 - Lời giải hiện tại: ${solution ? `"${solution.slice(0, 1500)}..."` : "Đã có lời giải trước"}
 

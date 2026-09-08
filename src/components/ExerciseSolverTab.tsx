@@ -5,8 +5,9 @@ import {
   SolutionDepth,
   SavedStudyItem,
   TutorMessage,
+  SubjectInfo,
+  GradeId,
 } from '../types';
-import { SUBJECTS, TEXTBOOKS } from '../data/subjects';
 import { SubjectIcon } from './SubjectIcon';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import {
@@ -33,13 +34,21 @@ import {
 interface ExerciseSolverTabProps {
   onSaveExercise: (item: Omit<SavedStudyItem, 'id' | 'date'>) => void;
   isItemSaved: (title: string, subject: string) => boolean;
+  subjects: SubjectInfo[];
+  gradeLabel: string;
+  grade: GradeId;
 }
 
 export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
   onSaveExercise,
   isItemSaved,
+  subjects,
+  gradeLabel,
+  grade,
 }) => {
-  const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>('toan');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>(
+    (subjects[0]?.id as SubjectId) || 'toan'
+  );
   const [selectedTextbook, setSelectedTextbook] =
     useState<TextbookSeries>('Tổng hợp / Chung');
   const [problemText, setProblemText] = useState('');
@@ -65,7 +74,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentSubject =
-    SUBJECTS.find((s) => s.id === selectedSubjectId) || SUBJECTS[0];
+    subjects.find((s) => s.id === selectedSubjectId) || subjects[0];
 
   const handleImageUpload = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -125,6 +134,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
           mimeType: imageMimeType,
           solutionDepth,
           sourceUrl: currentSubject.loigiaihayUrl || '',
+          grade,
         }),
       });
 
@@ -173,6 +183,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
           originalProblem: problemText,
           solution,
           userQuestion: userQ,
+          grade,
         }),
       });
 
@@ -241,7 +252,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-blue-100 text-xs font-semibold backdrop-blur-xs mb-3">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>AI Giải Bài Tập Chuẩn Lời Giải Hay (loigiaihay.com) Lớp 12</span>
+            <span>AI Giải Bài Tập Chuẩn Lời Giải Hay (loigiaihay.com) {gradeLabel}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Giải Chi Tiết Bài Tập Mọi Môn Học
@@ -266,7 +277,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
                   1
                 </span>
-                Môn Học Lớp 12
+                Môn Học {gradeLabel}
               </label>
               {currentSubject.loigiaihayUrl && (
                 <a
@@ -283,7 +294,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
             </div>
 
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {SUBJECTS.map((s) => {
+              {subjects.map((s) => {
                 const isSelected = s.id === selectedSubjectId;
                 return (
                   <button
@@ -396,7 +407,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
             {currentSubject.sampleQuestions.length > 0 && (
               <div className="space-y-1.5 pt-2 border-t border-slate-100">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Đề bài mẫu {currentSubject.shortName} 12 (thử nhanh):
+                  Đề bài mẫu {currentSubject.shortName} {grade} (thử nhanh):
                 </span>
                 <div className="space-y-1">
                   {currentSubject.sampleQuestions.map((q, idx) => (

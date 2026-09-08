@@ -2,11 +2,11 @@ import React from 'react';
 import {
   BookOpenCheck,
   Edit3,
-  HelpCircle,
   FolderHeart,
   Sparkles,
   Library,
 } from 'lucide-react';
+import { GradeId } from '../types';
 
 export type TabType = 'notes' | 'solver' | 'saved' | 'presets';
 
@@ -14,13 +14,18 @@ interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   savedCount: number;
+  grade: GradeId;
+  onGradeChange: (grade: GradeId) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   savedCount,
+  grade,
+  onGradeChange,
 }) => {
+  const gradeLabel = `Lớp ${grade}`;
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -37,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
-                  Học Tập <span className="text-indigo-600">Lớp 12</span>
+                  Học Tập <span className="text-indigo-600">{gradeLabel}</span>
                 </span>
                 <span className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-2 py-0.5 rounded-full uppercase tracking-wider hidden sm:inline-block">
                   GDPT 2018
@@ -55,9 +60,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </a>
               </div>
               <p className="text-[11px] text-slate-500 font-medium hidden lg:block">
-                Soạn bài & Giải bài tập 11 môn Lớp 12 dựa trên nguồn Lời Giải Hay
+                Soạn bài & Giải bài tập 11 môn {gradeLabel} dựa trên nguồn Lời Giải Hay
               </p>
             </div>
+          </div>
+
+          {/* Grade Switcher */}
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 self-start lg:self-auto">
+            {(['10', '11', '12'] as GradeId[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => onGradeChange(g)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-150 ${
+                  grade === g
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                }`}
+              >
+                {g}
+              </button>
+            ))}
           </div>
 
           {/* Navigation Tabs */}
