@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   SubjectInfo,
   SubjectId,
@@ -56,6 +56,12 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+
+  const scrollOutputIntoView = () => {
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const currentSubject =
     SUBJECTS.find((s) => s.id === selectedSubjectId) || SUBJECTS[0];
@@ -88,6 +94,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
     setErrorMsg(null);
     setIsLoading(true);
     setIsEditing(false);
+    scrollOutputIntoView();
 
     try {
       const response = await fetch('/api/lesson-note', {
@@ -531,7 +538,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         </div>
 
         {/* Right Column: Output Result Pane */}
-        <div className="lg:col-span-7">
+        <div ref={outputRef} className="lg:col-span-7 scroll-mt-24">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col min-h-[580px]">
             {/* Output Header */}
             <div className="px-4 sm:px-5 py-3.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-wrap gap-2">

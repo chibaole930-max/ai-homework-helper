@@ -50,6 +50,12 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
   const [solution, setSolution] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+
+  const scrollOutputIntoView = () => {
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Tutor followup state
   const [tutorInput, setTutorInput] = useState('');
@@ -103,6 +109,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
     setErrorMsg(null);
     setIsLoading(true);
     setTutorChat([]); // reset followups
+    scrollOutputIntoView();
 
     try {
       const response = await fetch('/api/solve-exercise', {
@@ -504,7 +511,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
         </div>
 
         {/* Right Column: Output & Followup Tutor */}
-        <div className="lg:col-span-7 space-y-4">
+        <div ref={outputRef} className="lg:col-span-7 space-y-4 scroll-mt-24">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col min-h-[580px]">
             {/* Output Header */}
             <div className="px-4 sm:px-5 py-3.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-wrap gap-2">
