@@ -534,10 +534,10 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         <div className="lg:col-span-7">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col min-h-[580px]">
             {/* Output Header */}
-            <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span className="text-sm font-bold text-slate-800">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                <span className="text-sm font-bold text-slate-800 truncate">
                   {lessonTitle
                     ? `${currentSubject.shortName}: ${lessonTitle}`
                     : 'Nội dung bài ghi vở'}
@@ -606,7 +606,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             </div>
 
             {/* Output Body */}
-            <div className="p-6 flex-1 overflow-y-auto">
+            <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
               {isLoading ? (
                 <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-center space-y-4 py-16">
                   <div className="relative">

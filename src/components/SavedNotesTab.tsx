@@ -369,7 +369,7 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               <MarkdownRenderer content={activeItem.content} />
             </div>
           </div>

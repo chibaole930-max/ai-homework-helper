@@ -430,7 +430,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               <MarkdownRenderer content={activeItem.content} />
             </div>
           </div>
@@ -459,7 +459,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   <label className="text-xs font-bold text-slate-600 mb-1 block">
