@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { Pool } from "pg";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
@@ -446,6 +447,140 @@ async function ensureUsageTable(pool: Pool) {
       count INTEGER NOT NULL DEFAULT 0
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+}
+
+// ---------------------------------------------------------------------------
+// CÀI ĐẶT TRANG / TRANG ADMIN (bảo trì + gửi thông báo)
+// - Đăng nhập admin bằng mật khẩu từ biến môi trường ADMIN_PASSWORD.
+// - Chế độ bảo trì: khóa các API AI (503), người dùng thấy màn hình bảo trì.
+// - Thông báo: banner toàn trang cho học sinh (có nút đóng ở frontend).
+// - Lưu vĩnh viễn trong PostgreSQL (bảng site_settings) hoặc file JSON fallback.
+// ---------------------------------------------------------------------------
+
+const SITE_SETTINGS_FILE = path.join(process.cwd(), "data", "site-settings.json");
+
+interface SiteSettings {
+  maintenance: { enabled: boolean; message: string };
+  announcement: { enabled: boolean; text: string };
+}
+
+const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  maintenance: { enabled: false, message: "" },
+  announcement: { enabled: false, text: "" },
+};
+
+let cachedSiteSettings: SiteSettings | null = null;
+
+async function readSiteSettings(): Promise<SiteSettings> {
+  if (cachedSiteSettings) return cachedSiteSettings;
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query(
+        "SELECT value FROM site_settings WHERE key = $1",
+        ["site"]
+      );
+      if (rows.length) {
+        const parsed = JSON.parse(rows[0].value);
+        cachedSiteSettings = {
+          maintenance: {
+            enabled: !!parsed.maintenance?.enabled,
+            message: String(parsed.maintenance?.message || ""),
+          },
+          announcement: {
+            enabled: !!parsed.announcement?.enabled,
+            text: String(parsed.announcement?.text || ""),
+          },
+        };
+        return cachedSiteSettings;
+      }
+    } catch (err) {
+      console.warn("[Admin] Không đọc được PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(SITE_SETTINGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(SITE_SETTINGS_FILE, "utf-8"));
+      cachedSiteSettings = {
+        maintenance: {
+          enabled: !!parsed.maintenance?.enabled,
+          message: String(parsed.maintenance?.message || ""),
+        },
+        announcement: {
+          enabled: !!parsed.announcement?.enabled,
+          text: String(parsed.announcement?.text || ""),
+        },
+      };
+      return cachedSiteSettings;
+    }
+  } catch {
+    // ignore
+  }
+  cachedSiteSettings = {
+    maintenance: { enabled: false, message: "" },
+    announcement: { enabled: false, text: "" },
+  };
+  return cachedSiteSettings;
+}
+
+async function writeSiteSettings(settings: SiteSettings) {
+  cachedSiteSettings = settings;
+  const raw = JSON.stringify(settings);
+  if (pgPool) {
+    try {
+      await pgPool.query(
+        `INSERT INTO site_settings (key, value) VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        ["site", raw]
+      );
+      return;
+    } catch (err) {
+      console.warn("[Admin] Không ghi được PostgreSQL:", err);
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(SITE_SETTINGS_FILE), { recursive: true });
+    fs.writeFileSync(SITE_SETTINGS_FILE, raw, "utf-8");
+  } catch (err) {
+    console.warn("[Admin] Không lưu được file:", err);
+  }
+}
+
+async function getMaintenanceMessage(): Promise<string> {
+  const s = await readSiteSettings();
+  return s.maintenance.enabled ? s.maintenance.message : "";
+}
+
+const adminTokens = new Map<string, number>();
+const ADMIN_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+
+function isAdminTokenValid(token: string): boolean {
+  const exp = adminTokens.get(token);
+  if (!exp) return false;
+  if (Date.now() > exp) {
+    adminTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function requireAdmin(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token || !isAdminTokenValid(token)) {
+    return res.status(401).json({ error: "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." });
+  }
+  (req as any).adminToken = token;
+  next();
 }
 
 if (pgPool) {
@@ -486,6 +621,87 @@ async function startServer() {
     }
   });
 
+  // API: Trạng thái công khai (thông báo + bảo trì) — không cần đăng nhập
+  app.get("/api/site/status", async (_req, res) => {
+    try {
+      const settings = await readSiteSettings();
+      res.json({
+        maintenance: settings.maintenance,
+        announcement: settings.announcement,
+        now: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("Error reading site status:", err);
+      res.status(500).json({ error: "Không đọc được trạng thái trang." });
+    }
+  });
+
+  // API: Đăng nhập admin
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      if (!process.env.ADMIN_PASSWORD) {
+        return res.status(503).json({
+          error: "Chưa cấu hình ADMIN_PASSWORD trên server (biến môi trường).",
+        });
+      }
+      const { password } = req.body || {};
+      if (!password || password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: "Sai mật khẩu quản trị." });
+      }
+      const token = crypto.randomBytes(24).toString("hex");
+      adminTokens.set(token, Date.now() + ADMIN_TOKEN_TTL_MS);
+      res.json({ token, expiresIn: ADMIN_TOKEN_TTL_MS });
+    } catch (err: any) {
+      console.error("Admin login error:", err);
+      res.status(500).json({ error: "Lỗi đăng nhập." });
+    }
+  });
+
+  // API: Đăng xuất admin
+  app.post("/api/admin/logout", requireAdmin, (req, res) => {
+    adminTokens.delete((req as any).adminToken);
+    res.json({ ok: true });
+  });
+
+  // API: Xem cài đặt (admin)
+  app.get("/api/admin/settings", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await readSiteSettings());
+    } catch (err: any) {
+      console.error("Error reading admin settings:", err);
+      res.status(500).json({ error: "Không đọc được cài đặt." });
+    }
+  });
+
+  // API: Cập nhật cài đặt (admin)
+  app.post("/api/admin/settings", requireAdmin, async (req, res) => {
+    try {
+      const { maintenance, announcement } = req.body || {};
+      const current = await readSiteSettings();
+      const next: SiteSettings = {
+        maintenance: {
+          enabled:
+            maintenance?.enabled === undefined
+              ? current.maintenance.enabled
+              : !!maintenance.enabled,
+          message: String(maintenance?.message ?? current.maintenance.message).slice(0, 500),
+        },
+        announcement: {
+          enabled:
+            announcement?.enabled === undefined
+              ? current.announcement.enabled
+              : !!announcement.enabled,
+          text: String(announcement?.text ?? current.announcement.text).slice(0, 2000),
+        },
+      };
+      await writeSiteSettings(next);
+      res.json(next);
+    } catch (err: any) {
+      console.error("Admin update failed:", err);
+      res.status(500).json({ error: "Không lưu được cài đặt." });
+    }
+  });
+
   // API: Soạn bài ghi Lớp 12 (Bám sát nguồn & phong cách Lời Giải Hay - loigiaihay.com)
   app.post("/api/lesson-note", async (req, res) => {
     try {
@@ -502,6 +718,12 @@ async function startServer() {
 
       if (!subject || !lessonTitle) {
         return res.status(400).json({ error: "Thiếu thông tin môn học hoặc tên bài học." });
+      }
+
+      // Chế độ bảo trì: khóa AI
+      const maintenanceMsg = await getMaintenanceMessage();
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
 
       // Giới hạn lượt soạn bài miễn phí: 3 lượt/ngày theo IP
@@ -640,6 +862,12 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
 
       if (!problemText && !imageBase64) {
         return res.status(400).json({ error: "Vui lòng nhập đề bài hoặc tải ảnh chụp bài tập." });
+      }
+
+      // Chế độ bảo trì: khóa AI
+      const maintenanceMsg = await getMaintenanceMessage();
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
 
       const ai = getGeminiClient();
@@ -808,6 +1036,12 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         return res.status(400).json({
           error: "Thiếu thông tin bài mẫu (cần có tên bài, môn học và nội dung).",
         });
+      }
+
+      // Chế độ bảo trì: khóa đóng góp bài mẫu
+      const maintenanceMsg = await getMaintenanceMessage();
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
 
       const newItem: CommunityPresetItem = {

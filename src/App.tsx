@@ -9,16 +9,63 @@ import { LessonNoteTab } from './components/LessonNoteTab';
 import { ExerciseSolverTab } from './components/ExerciseSolverTab';
 import { SavedNotesTab } from './components/SavedNotesTab';
 import { PresetLibraryTab } from './components/PresetLibraryTab';
+import AdminTab from './components/AdminTab';
 import { SavedStudyItem } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS } from './data/subjects';
-import { CheckCircle2, Sparkles, BookOpen, GraduationCap } from 'lucide-react';
+import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, X, Wrench } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
+const ANNOUNCE_KEY = 'announcement_dismissed_v1';
+
+interface SiteStatus {
+  maintenance: { enabled: boolean; message: string };
+  announcement: { enabled: boolean; text: string };
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('notes');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(
+    () => window.location.hash === '#/admin'
+  );
+  const [siteStatus, setSiteStatus] = useState<SiteStatus | null>(null);
+
+  useEffect(() => {
+    const onHash = () => setIsAdmin(window.location.hash === '#/admin');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  useEffect(() => {
+    const load = () => {
+      fetch('/api/site/status')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d) setSiteStatus(d as SiteStatus);
+        })
+        .catch(() => {});
+    };
+    load();
+    const t = window.setInterval(load, 60000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const announcementText = siteStatus?.announcement?.enabled
+    ? siteStatus.announcement.text
+    : '';
+  const [announcementVisible, setAnnouncementVisible] = useState(false);
+
+  useEffect(() => {
+    setAnnouncementVisible(
+      !!announcementText && localStorage.getItem(ANNOUNCE_KEY) !== announcementText
+    );
+  }, [announcementText]);
+
+  const dismissAnnouncement = () => {
+    if (announcementText) localStorage.setItem(ANNOUNCE_KEY, announcementText);
+    setAnnouncementVisible(false);
+  };
 
   // Initialize saved items from localStorage or fallback to default sample presets
   const [savedItems, setSavedItems] = useState<SavedStudyItem[]>(() => {
@@ -114,6 +161,42 @@ export default function App() {
     );
   };
 
+  if (isAdmin) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+        <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <AdminTab />
+        </div>
+      </div>
+    );
+  }
+
+  if (siteStatus?.maintenance.enabled) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          savedCount={savedItems.length}
+        />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto">
+              <Wrench className="w-8 h-8" />
+            </div>
+            <h1 className="text-xl font-extrabold text-slate-900">
+              Hệ Thống Đang Bảo Trì
+            </h1>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              {siteStatus.maintenance.message ||
+                'Chúng tôi đang nâng cấp và hoàn thiện. Vui lòng quay lại sau ít phút nữa nhé!'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Navbar */}
@@ -125,6 +208,20 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+        {announcementVisible && announcementText && (
+          <div className="mb-4 px-4 py-3 rounded-2xl border border-sky-200 bg-sky-50 text-sky-900 text-sm flex items-start gap-2.5">
+            <Megaphone className="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" />
+            <span className="flex-1 leading-relaxed">{announcementText}</span>
+            <button
+              onClick={dismissAnnouncement}
+              className="p-1 rounded-md hover:bg-sky-100 text-sky-400"
+              aria-label="Đóng thông báo"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {activeTab === 'notes' && (
           <LessonNoteTab
             onSaveNote={handleSaveItem}
