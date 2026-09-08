@@ -13,12 +13,34 @@ import {
   Hourglass,
   Eye,
   Trash2,
+  BarChart3,
+  Users,
 } from 'lucide-react';
 
 interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
 }
+
+interface StatsOverview {
+  today: string;
+  todayEvents: Record<string, number>;
+  uniqueToday: number;
+  totals: Record<string, number>;
+  daily: {
+    day: string;
+    events: Record<string, number>;
+    uniqueVisitors: number;
+  }[];
+}
+
+const STAT_EVENT_LABELS: Record<string, string> = {
+  page_view: 'Lượt xem',
+  lesson_note: 'Soạn bài',
+  solve_exercise: 'Giải bài',
+  tutor_followup: 'Hỏi đáp',
+  community_share: 'Chia sẻ',
+};
 
 interface PendingPresetItem {
   id: string;
@@ -55,6 +77,9 @@ export default function AdminTab() {
   const [pendingBusy, setPendingBusy] = useState<string | null>(null);
   const [pendingMsg, setPendingMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const [stats, setStats] = useState<StatsOverview | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
@@ -88,7 +113,33 @@ export default function AdminTab() {
         setPendingMsg({ ok: false, text: err.message || 'Không tải được.' })
       )
       .finally(() => setPendingLoading(false));
+    setStatsLoading(true);
+    fetch('/api/admin/stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Không tải được thống kê.');
+        return r.json();
+      })
+      .then((d) => setStats(d as StatsOverview))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
   }, [token]);
+
+  const refreshStats = () => {
+    if (!token) return;
+    setStatsLoading(true);
+    fetch('/api/admin/stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Không tải được thống kê.');
+        return r.json();
+      })
+      .then((d) => setStats(d as StatsOverview))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  };
 
   const handleApprovePending = async (id: string) => {
     setPendingBusy(id);
@@ -400,6 +451,106 @@ export default function AdminTab() {
             báo sẽ hiện trên mọi trang trong ~60 giây.
           </span>
         </div>
+      </div>
+
+      {/* Thống kê sử dụng thật */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-teal-100 text-teal-600">
+              <BarChart3 className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800">Thống Kê Sử Dụng Thật</h2>
+              <p className="text-[11px] text-slate-500">
+                Số liệu real đếm trực tiếp từ request thực tế của người dùng.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={refreshStats}
+            disabled={statsLoading}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50"
+          >
+            {statsLoading ? 'Đang tải...' : 'Làm mới'}
+          </button>
+        </div>
+
+        {statsLoading && !stats ? (
+          <div className="py-6 flex justify-center text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        ) : stats ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
+                <div className="text-[10px] font-bold text-violet-500 uppercase flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  Người dùng hôm nay
+                </div>
+                <div className="text-lg font-extrabold text-violet-700 mt-0.5">
+                  {stats.uniqueToday.toLocaleString('vi-VN')}
+                </div>
+              </div>
+              {Object.keys(STAT_EVENT_LABELS).map((ev) => (
+                <div key={ev} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase">
+                    {STAT_EVENT_LABELS[ev]} hôm nay
+                  </div>
+                  <div className="text-lg font-extrabold text-slate-800 mt-0.5">
+                    {(stats.todayEvents[ev] || 0).toLocaleString('vi-VN')}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 px-1">
+              <span className="font-bold text-slate-600">Tổng cộng:</span>
+              {Object.keys(STAT_EVENT_LABELS).map((ev) => (
+                <span key={ev}>
+                  {STAT_EVENT_LABELS[ev]} <b className="text-slate-800">{(stats.totals[ev] || 0).toLocaleString('vi-VN')}</b>
+                </span>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-slate-400 border-b border-slate-200">
+                    <th className="text-left py-1.5 font-bold">Ngày</th>
+                    <th className="text-right py-1.5 font-bold">Người dùng</th>
+                    {Object.keys(STAT_EVENT_LABELS).map((ev) => (
+                      <th key={ev} className="text-right py-1.5 font-bold">
+                        {STAT_EVENT_LABELS[ev]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...stats.daily].reverse().map((row) => {
+                    const [y, m, d] = row.day.split('-');
+                    const isToday = row.day === stats.today;
+                    return (
+                      <tr key={row.day} className="border-b border-slate-100">
+                        <td className="py-1.5 text-slate-600 font-semibold">
+                          {isToday ? 'Hôm nay' : `${d}/${m}`}
+                        </td>
+                        <td className="py-1.5 text-right font-bold text-violet-700">
+                          {row.uniqueVisitors}
+                        </td>
+                        {Object.keys(STAT_EVENT_LABELS).map((ev) => (
+                          <td key={ev} className="py-1.5 text-right text-slate-700">
+                            {row.events[ev] || 0}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
       </div>
 
       {/* Duyệt bài mẫu chờ */}

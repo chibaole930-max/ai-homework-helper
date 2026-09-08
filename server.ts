@@ -666,6 +666,184 @@ async function ensureUsageTable(pool: Pool) {
       value TEXT NOT NULL
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_stats (
+      stats_key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_visitors (
+      day TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      PRIMARY KEY (day, ip)
+    )
+  `);
+}
+
+// ---------------------------------------------------------------------------
+// THỐNG KÊ SỬ DỤNG THẬT (real data từ chính các request)
+// - Đếm từng sự kiện thật: soạn bài, giải bài, hỏi đáp, chia sẻ, xem web.
+// - Đếm số người dùng duy nhất/ngày theo IP (chống trùng bằng PRIMARY KEY).
+// - Lưu PostgreSQL (site_stats + daily_visitors) hoặc file JSON fallback.
+// ---------------------------------------------------------------------------
+
+const STATS_DATA_FILE = path.join(process.cwd(), "data", "stats.json");
+
+const STATS_EVENTS = [
+  "page_view",
+  "lesson_note",
+  "solve_exercise",
+  "tutor_followup",
+  "community_share",
+] as const;
+type StatEvent = (typeof STATS_EVENTS)[number];
+
+const STATS_EVENT_LABELS: Record<StatEvent, string> = {
+  page_view: "Lượt xem web",
+  lesson_note: "Soạn bài AI",
+  solve_exercise: "Giải bài AI",
+  tutor_followup: "Hỏi đáp thêm",
+  community_share: "Chia sẻ bài mẫu",
+};
+
+function statDay(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readStatsFile(): {
+  counters: Record<string, number>;
+  visitors: Record<string, string[]>;
+} {
+  try {
+    if (fs.existsSync(STATS_DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(STATS_DATA_FILE, "utf-8"));
+      return {
+        counters: parsed && typeof parsed.counters === "object" ? parsed.counters : {},
+        visitors: parsed && typeof parsed.visitors === "object" ? parsed.visitors : {},
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { counters: {}, visitors: {} };
+}
+
+function writeStatsFile(store: {
+  counters: Record<string, number>;
+  visitors: Record<string, string[]>;
+}) {
+  try {
+    fs.mkdirSync(path.dirname(STATS_DATA_FILE), { recursive: true });
+    fs.writeFileSync(STATS_DATA_FILE, JSON.stringify(store), "utf-8");
+  } catch (err) {
+    console.warn("[Stats] Không lưu được file:", err);
+  }
+}
+
+// Ghi nhận 1 sự kiện thật (+ ghi người dùng theo IP nếu có request)
+async function bumpStat(event: string, req?: express.Request): Promise<void> {
+  const day = statDay();
+  const key = `${day}|${event}`;
+  const ip = req?.ip || "";
+
+  if (pgPool) {
+    try {
+      await pgPool.query(
+        `INSERT INTO site_stats (stats_key, count) VALUES ($1, 1)
+         ON CONFLICT (stats_key) DO UPDATE SET count = site_stats.count + 1`,
+        [key]
+      );
+    } catch (err) {
+      console.warn("[Stats] Không ghi được PostgreSQL:", err);
+    }
+    if (ip) {
+      try {
+        await pgPool.query(
+          "INSERT INTO daily_visitors (day, ip) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+          [day, ip]
+        );
+      } catch (err) {
+        console.warn("[Stats] Không ghi được visitor PostgreSQL:", err);
+      }
+    }
+    return;
+  }
+
+  // Fallback: file JSON
+  const store = readStatsFile();
+  store.counters[key] = (store.counters[key] || 0) + 1;
+  if (ip) {
+    const list = store.visitors[day] || (store.visitors[day] = []);
+    if (!list.includes(ip)) list.push(ip);
+  }
+  writeStatsFile(store);
+}
+
+// Gộp dữ liệu thống kê cho trang admin
+async function loadStatsOverview() {
+  const today = statDay();
+  const dailyKeys: string[] = [];
+  const base = new Date();
+  base.setHours(12, 0, 0, 0);
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(base.getTime() - i * 86400000);
+    dailyKeys.push(d.toISOString().slice(0, 10));
+  }
+
+  let counters: Record<string, number> = {};
+  let visitors: Record<string, number> = {};
+
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query("SELECT stats_key, count FROM site_stats");
+      counters = {};
+      for (const r of rows) counters[r.stats_key] = Number(r.count);
+      const vRes = await pgPool.query(
+        "SELECT day, COUNT(*)::int AS c FROM daily_visitors GROUP BY day"
+      );
+      visitors = {};
+      for (const r of vRes.rows) visitors[r.day] = Number(r.c);
+    } catch (err) {
+      console.warn("[Stats] Không đọc được PostgreSQL:", err);
+      counters = {};
+      visitors = {};
+    }
+  } else {
+    const store = readStatsFile();
+    counters = store.counters;
+    visitors = {};
+    for (const [day, ips] of Object.entries(store.visitors)) {
+      visitors[day] = Array.isArray(ips) ? ips.length : Number(ips) || 0;
+    }
+  }
+
+  const totals: Record<string, number> = {};
+  let totalUniqueVisitors = 0;
+  for (const ev of STATS_EVENTS) totals[ev] = 0;
+  for (const [k, v] of Object.entries(counters)) {
+    const ev = k.split("|")[1] as StatEvent;
+    if (ev && ev in totals) totals[ev] += v;
+  }
+  const daily = dailyKeys.map((day) => {
+    const per: Record<string, number> = {};
+    for (const ev of STATS_EVENTS) {
+      per[ev] = counters[`${day}|${ev}`] || 0;
+      totalUniqueVisitors += visitors[day] || 0;
+    }
+    return { day, events: per, uniqueVisitors: visitors[day] || 0 };
+  });
+
+  const todayEvents: Record<string, number> = {};
+  for (const ev of STATS_EVENTS) todayEvents[ev] = counters[`${today}|${ev}`] || 0;
+
+  return {
+    today,
+    todayEvents,
+    uniqueToday: visitors[today] || 0,
+    totals,
+    daily,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -849,6 +1027,22 @@ async function startServer() {
     }
   });
 
+  // API: Ghi nhận sự kiện sử dụng thật (chỉ cho phép page_view — các sự kiện
+  // AI khác được đếm trực tiếp phía server, không cho phía client sửa được)
+  app.post("/api/stats/event", async (req, res) => {
+    try {
+      const ev = String(req.body?.event || "");
+      if (ev !== "page_view") {
+        return res.status(400).json({ error: "Loại thống kê không hợp lệ." });
+      }
+      await bumpStat(ev, req);
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("Error recording stat event:", err);
+      res.status(500).json({ error: "Không ghi được thống kê." });
+    }
+  });
+
   // API: Đăng nhập admin
   app.post("/api/admin/login", async (req, res) => {
     try {
@@ -912,6 +1106,16 @@ async function startServer() {
     } catch (err: any) {
       console.error("Admin update failed:", err);
       res.status(500).json({ error: "Không lưu được cài đặt." });
+    }
+  });
+
+  // API: Thống kê sử dụng thật (admin)
+  app.get("/api/admin/stats", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await loadStatsOverview());
+    } catch (err: any) {
+      console.error("Error loading stats:", err);
+      res.status(500).json({ error: "Không tải được thống kê." });
     }
   });
 
@@ -1087,6 +1291,7 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
 
       const content = response.text || "Không tạo được nội dung bài học. Vui lòng thử lại.";
       await incrementUsage(usageKeyForReq);
+      await bumpStat("lesson_note", req).catch(() => {});
 
       // Tự động đề xuất bài mẫu chờ admin duyệt (không làm hỏng response nếu lỗi)
       if (content.length > 50 && content !== "Không tạo được nội dung bài học. Vui lòng thử lại.") {
@@ -1233,6 +1438,7 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
       });
 
       const solution = response.text || "Không thể giải bài tập này. Vui lòng kiểm tra lại ảnh hoặc đề bài.";
+      await bumpStat("solve_exercise", req).catch(() => {});
       res.json({ result: solution });
     } catch (err: any) {
       console.error("Error solving exercise:", err);
@@ -1274,6 +1480,7 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         },
       });
 
+      await bumpStat("tutor_followup", req).catch(() => {});
       res.json({ result: response.text || "Xin lỗi, hiện chưa thể trả lời câu hỏi này." });
     } catch (err: any) {
       console.error("Error in tutor followup:", err);
@@ -1355,6 +1562,7 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
       }
 
       const saved = await insertPendingPreset(newItem);
+      await bumpStat("community_share", req).catch(() => {});
 
       res.status(201).json({
         pending: true,

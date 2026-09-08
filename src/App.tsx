@@ -51,6 +51,14 @@ export default function App() {
     return () => window.clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    fetch('/api/stats/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'page_view' }),
+    }).catch(() => {});
+  }, []);
+
   const announcementText = siteStatus?.announcement?.enabled
     ? siteStatus.announcement.text
     : '';
