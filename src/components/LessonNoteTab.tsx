@@ -35,7 +35,6 @@ import {
   X,
   Loader2,
   Send,
-  Gift,
 } from 'lucide-react';
 
 interface LessonNoteTabProps {
@@ -61,23 +60,12 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Giới hạn lượt soạn bài miễn phí (3 lần/ngày theo IP + tối đa 1 lượt từ mã chia sẻ)
+  // Giới hạn lượt soạn bài miễn phí (3 lượt/ngày theo IP)
   const [usage, setUsage] = useState<{
     limit: number;
-    bonus: number;
-    available: number;
     used: number;
     remaining: number;
-    shareCode: string | null;
   } | null>(null);
-  // Chia sẻ mã nhận thêm lượt soạn bài
-  const [myShareCode, setMyShareCode] = useState<string | null>(null);
-  const [shareCodeLoading, setShareCodeLoading] = useState(false);
-  const [shareCodeMsg, setShareCodeMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [shareCodeCopied, setShareCodeCopied] = useState(false);
-  const [redeemInput, setRedeemInput] = useState('');
-  const [redeeming, setRedeeeming] = useState(false);
-  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // Chia sẻ bài mẫu lên Kho chung
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTitle, setShareTitle] = useState('');
@@ -88,82 +76,14 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [shared, setShared] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
 
-  const refreshUsage = React.useCallback(() => {
+  useEffect(() => {
     fetch('/api/usage/status')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d) {
-          setUsage(d);
-          if (d.shareCode) setMyShareCode(d.shareCode);
-        }
+        if (d) setUsage(d);
       })
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    refreshUsage();
-    const timer = setInterval(refreshUsage, 60000);
-    return () => clearInterval(timer);
-  }, [refreshUsage]);
-
-  const handleCreateShareCode = async () => {
-    setShareCodeLoading(true);
-    setShareCodeMsg(null);
-    try {
-      const res = await fetch('/api/usage/share-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Không tạo được mã chia sẻ.');
-      setMyShareCode(data.code);
-      setShareCodeMsg({
-        ok: true,
-        text: data.reuse
-          ? 'Bạn đã có mã chia sẻ hôm nay, mã vẫn còn hiệu lực.'
-          : 'Mã chia sẻ của bạn đã sẵn sàng! Chia sẻ để nhận +1 lượt soạn bài.',
-      });
-      refreshUsage();
-    } catch (err: any) {
-      setShareCodeMsg({ ok: false, text: err.message || 'Không tạo được mã chia sẻ.' });
-    } finally {
-      setShareCodeLoading(false);
-    }
-  };
-
-  const handleCopyShareCode = async () => {
-    if (!myShareCode) return;
-    try {
-      await navigator.clipboard.writeText(myShareCode);
-      setShareCodeCopied(true);
-      setTimeout(() => setShareCodeCopied(false), 2000);
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleRedeemCode = async () => {
-    if (!redeemInput.trim()) return;
-    setRedeeeming(true);
-    setRedeemMsg(null);
-    try {
-      const res = await fetch('/api/usage/redeem-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: redeemInput.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Không nhập được mã.');
-      setRedeemMsg({ ok: true, text: data.message || 'Thành công!' });
-      setRedeemInput('');
-      refreshUsage();
-    } catch (err: any) {
-      setRedeemMsg({ ok: false, text: err.message || 'Không thể nhập mã.' });
-    } finally {
-      setRedeeeming(false);
-    }
-  };
 
   const openShareModal = () => {
     setShareTitle(lessonTitle.trim() || `Bài ghi ${currentSubject.shortName}`);
@@ -277,7 +197,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           ? {
               ...prev,
               used: prev.used + 1,
-              remaining: Math.max(0, prev.available - (prev.used + 1)),
+              remaining: Math.max(0, prev.limit - (prev.used + 1)),
             }
           : prev
       );
@@ -352,12 +272,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           <span className="font-medium flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
             Soạn bài miễn phí hôm nay: còn{' '}
-            <b className="text-indigo-900">{usage.remaining}/{usage.available}</b> lượt
-            {usage.bonus >= 1 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
-                +1 lượt từ chia sẻ
-              </span>
-            )}
+            <b className="text-indigo-900">{usage.remaining}/{usage.limit}</b> lượt
           </span>
         </div>
       )}
@@ -365,125 +280,10 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-amber-50 border-amber-200 text-amber-800">
           <span className="font-medium flex items-center gap-1.5">
             <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-            Bạn đã dùng hết {usage.available} lượt soạn bài miễn phí hôm nay. Hạn mức sẽ reset vào ngày mai.
+            Bạn đã dùng hết {usage.limit} lượt soạn bài miễn phí hôm nay. Hạn mức sẽ reset vào ngày mai.
           </span>
         </div>
       )}
-
-      {/* Chia sẻ mã nhận thêm lượt soạn bài */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-            <span className="p-1.5 rounded-lg bg-rose-100 text-rose-500">
-              <Gift className="w-4 h-4" />
-            </span>
-            Chia sẻ mã nhận thêm <span className="text-rose-600">1 lượt soạn bài</span>
-          </div>
-          {usage && usage.bonus >= 1 && (
-            <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">
-              Đã nhận +1 lượt hôm nay
-            </span>
-          )}
-        </div>
-
-        <div className="text-xs text-slate-500 leading-relaxed">
-          Nhấn <b>Tạo mã</b>, gửi mã cho bạn bè. Khi bạn bè nhập mã, bạn được cộng{' '}
-          <b>+1 lượt</b> (tối đa 1 lượt/ngày). Mỗi mã chỉ dùng được <b>1 lần</b> duy nhất.
-        </div>
-
-        {!myShareCode && !shareCodeMsg && (
-          <button
-            type="button"
-            onClick={handleCreateShareCode}
-            disabled={shareCodeLoading}
-            className="w-full sm:w-auto px-4 py-2 text-sm font-bold rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white flex items-center justify-center gap-1.5"
-          >
-            {shareCodeLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Đang tạo mã...
-              </>
-            ) : (
-              <>
-                <Gift className="w-4 h-4" />
-                Tạo mã chia sẻ của tôi
-              </>
-            )}
-          </button>
-        )}
-
-        {shareCodeMsg && !myShareCode && (
-          <div
-            className={`px-3 py-2 rounded-xl text-xs ${
-              shareCodeMsg.ok
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                : 'bg-red-50 border border-red-200 text-red-700'
-            }`}
-          >
-            {shareCodeMsg.text}
-          </div>
-        )}
-
-        {myShareCode && (
-          <div className="rounded-xl border-2 border-dashed border-rose-200 bg-rose-50/60 p-3 sm:p-4 space-y-2">
-            <div className="text-[11px] text-slate-500 font-semibold">Mã chia sẻ của bạn</div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xl sm:text-2xl tracking-[0.25em] font-bold text-rose-600">
-                {myShareCode}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopyShareCode}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-100 flex items-center gap-1.5"
-              >
-                {shareCodeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {shareCodeCopied ? 'Đã sao chép' : 'Sao chép'}
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Không đăng mã công khai. Mã hết hiệu lực sau 48 giờ hoặc khi đã được dùng.
-            </p>
-          </div>
-        )}
-
-        <div className="border-t border-slate-100 pt-3 space-y-1.5">
-          <div className="flex gap-2">
-            <input
-              value={redeemInput}
-              onChange={(e) => setRedeemInput(e.target.value)}
-              placeholder="Nhập mã bạn bè gửi cho bạn..."
-              className="flex-1 px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none min-w-0"
-            />
-            <button
-              type="button"
-              onClick={handleRedeemCode}
-              disabled={redeeming || !redeemInput.trim()}
-              className="px-3 py-2 text-sm font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white flex items-center gap-1.5 flex-shrink-0"
-            >
-              {redeeming ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-              Nhập mã
-            </button>
-          </div>
-          {redeemMsg && (
-            <div
-              className={`px-3 py-2 rounded-xl text-xs ${
-                redeemMsg.ok
-                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                  : 'bg-red-50 border border-red-200 text-red-700'
-              }`}
-            >
-              {redeemMsg.text}
-            </div>
-          )}
-          <p className="text-[11px] text-slate-400">
-            Nhập mã sẽ giúp bạn của bạn được +1 lượt soạn hôm nay. Mỗi mã chỉ tác dụng 1 lần.
-          </p>
-        </div>
-      </div>
 
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
