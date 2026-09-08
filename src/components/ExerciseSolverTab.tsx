@@ -124,6 +124,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
           imageBase64: imagePreview,
           mimeType: imageMimeType,
           solutionDepth,
+          sourceUrl: currentSubject.loigiaihayUrl || '',
         }),
       });
 

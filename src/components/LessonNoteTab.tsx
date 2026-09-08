@@ -182,6 +182,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           loigiaihaySection,
           detailLevel,
           customNote: customNote.trim(),
+          sourceUrl: currentSubject.loigiaihayUrl || '',
         }),
       });
 

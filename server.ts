@@ -497,6 +497,7 @@ async function startServer() {
         loigiaihaySection = "all",
         detailLevel = "standard",
         customNote = "",
+        sourceUrl = "",
       } = req.body;
 
       if (!subject || !lessonTitle) {
@@ -591,6 +592,7 @@ Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
       const prompt = `YÊU CẦU SOẠN BÀI LỚP 12 THEO NGUỒN VÀ CHUẨN LỜI GIẢI HAY (loigiaihay.com):
 - Môn học: ${subject}
 - Bộ sách giáo khoa: ${textbook || "Kết nối tri thức với cuộc sống"}
+- Nguồn chính thức bám sát (trang chủ môn học trên loigiaihay.com): ${sourceUrl || "https://loigiaihay.com/"}
 - Tên bài học / Chủ đề: "${lessonTitle}"
 - Phong cách soạn bài: ${noteStyle}
 - Chuyên mục yêu cầu: ${loigiaihaySection}
@@ -633,6 +635,7 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
         mimeType = "image/jpeg",
         problemType = "auto",
         solutionDepth = "detailed",
+        sourceUrl = "",
       } = req.body;
 
       if (!problemText && !imageBase64) {
@@ -674,6 +677,9 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
         `YÊU CẦU GIẢI BÀI TẬP LỚP 12 THEO CHUẨN LỜI GIẢI HAY (loigiaihay.com):`,
         `- Môn học: ${subject || "Tự động nhận diện"}`,
         textbook ? `- Bộ sách: ${textbook}` : "",
+        sourceUrl
+          ? `- Nguồn chính thức bám sát (trang chủ môn học trên loigiaihay.com): ${sourceUrl}`
+          : "",
         problemType !== "auto" ? `- Dạng câu hỏi: ${problemType}` : "",
         `\n${depthGuide}\n`,
       ];
