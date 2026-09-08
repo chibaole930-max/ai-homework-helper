@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { PRESET_LESSON_NOTES } from "./src/data/presets";
+import { SUBJECTS } from "./src/data/subjects";
 
 dotenv.config();
 
@@ -160,6 +161,9 @@ if (pgPool) {
   ensureCommunityTable(pgPool).catch((err) => {
     console.error("[Community] Lỗi khởi tạo bảng PostgreSQL:", err);
   });
+  ensurePendingTable(pgPool).catch((err) => {
+    console.error("[Pending] Lỗi khởi tạo bảng PostgreSQL:", err);
+  });
 }
 
 async function loadAllPresets(): Promise<CommunityPresetItem[]> {
@@ -249,6 +253,215 @@ async function bumpLikes(id: string, liked: boolean): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// BÀI MẪU CHỜ DUYỆT (pending) — tự động từ AI soạn bài, hoặc chia sẻ thủ công
+// - Bài mẫu chỉ vào Kho công khai sau khi admin duyệt.
+// - Lưu PostgreSQL (bảng pending_presets) hoặc file JSON fallback.
+// ---------------------------------------------------------------------------
+
+interface PendingPresetItem {
+  id: string;
+  type: "note" | "exercise";
+  title: string;
+  subject: string;
+  subjectId: string;
+  textbook: string;
+  content: string;
+  date: string;
+  style?: string;
+  author: string;
+  source: "auto" | "manual";
+  createdAt: string;
+}
+
+const PENDING_DATA_FILE = path.join(process.cwd(), "data", "pending-presets.json");
+
+async function ensurePendingTable(pool: Pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pending_presets (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'note',
+      title TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      "subjectId" TEXT NOT NULL,
+      textbook TEXT NOT NULL,
+      content TEXT NOT NULL,
+      date TEXT,
+      style TEXT,
+      author TEXT NOT NULL DEFAULT 'Bạn ẩn danh',
+      source TEXT NOT NULL DEFAULT 'manual',
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+function rowToPendingPreset(row: any): PendingPresetItem {
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    subject: row.subject,
+    subjectId: row.subjectId,
+    textbook: row.textbook,
+    content: row.content,
+    date: row.date || new Date(row.createdAt).toLocaleDateString("vi-VN"),
+    style: row.style || undefined,
+    author: row.author,
+    source: row.source === "auto" ? "auto" : "manual",
+    createdAt:
+      row.createdAt instanceof Date
+        ? row.createdAt.toISOString()
+        : String(row.createdAt),
+  };
+}
+
+async function loadPendingPresets(): Promise<PendingPresetItem[]> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query(
+        'SELECT * FROM pending_presets ORDER BY "createdAt" DESC'
+      );
+      return rows.map(rowToPendingPreset);
+    } catch (err) {
+      console.warn("[Pending] Lỗi đọc PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(PENDING_DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(PENDING_DATA_FILE, "utf-8"));
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn("[Pending] Không đọc được file JSON:", err);
+  }
+  return [];
+}
+
+async function writePendingPresets(list: PendingPresetItem[]) {
+  fs.mkdirSync(path.dirname(PENDING_DATA_FILE), { recursive: true });
+  fs.writeFileSync(PENDING_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+// Kiểm tra bài đã tồn tại chưa: "pending" | "public" | null
+async function findExistingPreset(title: string, subject: string) {
+  const normTitle = title.trim().toLowerCase();
+  const normSubject = subject.trim();
+
+  const pending = await loadPendingPresets();
+  if (
+    pending.some(
+      (p) => p.title.trim().toLowerCase() === normTitle && p.subject === normSubject
+    )
+  ) {
+    return "pending";
+  }
+
+  const pub = await loadAllPresets();
+  if (
+    (pub as any[]).some(
+      (p) => String(p.title).trim().toLowerCase() === normTitle && p.subject === normSubject
+    )
+  ) {
+    return "public";
+  }
+
+  return null;
+}
+
+// Thêm bài chờ duyệt (có de-duplicate). Trả về null nếu trùng.
+async function insertPendingPreset(
+  item: PendingPresetItem
+): Promise<PendingPresetItem | null> {
+  const existing = await findExistingPreset(item.title, item.subject);
+  if (existing) return null;
+
+  if (pgPool) {
+    try {
+      await pgPool.query(
+        `INSERT INTO pending_presets
+           (id, type, title, subject, "subjectId", textbook, content, date, style, author, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          item.id,
+          item.type,
+          item.title,
+          item.subject,
+          item.subjectId,
+          item.textbook,
+          item.content,
+          item.date,
+          item.style || null,
+          item.author,
+          item.source,
+        ]
+      );
+      return item;
+    } catch (err) {
+      console.warn("[Pending] Lỗi ghi PostgreSQL:", err);
+    }
+  }
+  let list = await loadPendingPresets();
+  list = [item, ...list];
+  await writePendingPresets(list);
+  return item;
+}
+
+// Admin duyệt: chuyển bài chờ duyệt vào Kho bài mẫu công khai.
+async function approvePendingPreset(id: string): Promise<boolean> {
+  const list = await loadPendingPresets();
+  const item = list.find((x) => x.id === id);
+  if (!item) return false;
+
+  const publicItem: CommunityPresetItem = {
+    id: "community-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
+    type: item.type,
+    title: item.title,
+    subject: item.subject,
+    subjectId: item.subjectId,
+    textbook: item.textbook,
+    content: item.content,
+    date: item.date,
+    isFavorite: false,
+    style: item.style || "standard",
+    author: item.author || "Kho Học Liệu Mẫu",
+    likes: 0,
+    createdAt: new Date().toISOString(),
+    fromCommunity: true,
+  };
+
+  await insertPreset(publicItem);
+
+  if (pgPool) {
+    try {
+      await pgPool.query("DELETE FROM pending_presets WHERE id = $1", [id]);
+      return true;
+    } catch (err) {
+      console.warn("[Pending] Lỗi xóa PostgreSQL:", err);
+    }
+  }
+  const remaining = list.filter((x) => x.id !== id);
+  await writePendingPresets(remaining);
+  return true;
+}
+
+async function rejectPendingPreset(id: string): Promise<boolean> {
+  if (pgPool) {
+    try {
+      const { rowCount } = await pgPool.query(
+        "DELETE FROM pending_presets WHERE id = $1",
+        [id]
+      );
+      if (rowCount) return true;
+    } catch (err) {
+      console.warn("[Pending] Lỗi xóa PostgreSQL:", err);
+    }
+  }
+  const list = await loadPendingPresets();
+  const remaining = list.filter((x) => x.id !== id);
+  await writePendingPresets(remaining);
+  return true;
 }
 
 function getGeminiClient(): GoogleGenAI {
@@ -702,6 +915,44 @@ async function startServer() {
     }
   });
 
+  // API: Danh sách bài mẫu chờ duyệt (admin)
+  app.get("/api/admin/pending", requireAdmin, async (_req, res) => {
+    try {
+      const items = await loadPendingPresets();
+      res.json({ items, total: items.length });
+    } catch (err: any) {
+      console.error("Error loading pending presets:", err);
+      res.status(500).json({ error: "Không tải được danh sách chờ duyệt." });
+    }
+  });
+
+  // API: Duyệt bài mẫu -> đưa vào Kho cộng đồng (admin)
+  app.post("/api/admin/pending/:id/approve", requireAdmin, async (req, res) => {
+    try {
+      const ok = await approvePendingPreset(req.params.id);
+      if (!ok) {
+        return res.status(404).json({ error: "Không tìm thấy bài chờ duyệt." });
+      }
+      const items = await loadPendingPresets();
+      res.json({ ok: true, message: "Đã duyệt và đưa bài mẫu vào Kho chung.", items, total: items.length });
+    } catch (err: any) {
+      console.error("Error approving pending preset:", err);
+      res.status(500).json({ error: "Không duyệt được bài mẫu." });
+    }
+  });
+
+  // API: Bỏ qua bài mẫu chờ duyệt (admin)
+  app.post("/api/admin/pending/:id/reject", requireAdmin, async (req, res) => {
+    try {
+      await rejectPendingPreset(req.params.id);
+      const items = await loadPendingPresets();
+      res.json({ ok: true, message: "Đã bỏ bài mẫu này.", items, total: items.length });
+    } catch (err: any) {
+      console.error("Error rejecting pending preset:", err);
+      res.status(500).json({ error: "Không bỏ được bài mẫu." });
+    }
+  });
+
   // API: Soạn bài ghi Lớp 12 (Bám sát nguồn & phong cách Lời Giải Hay - loigiaihay.com)
   app.post("/api/lesson-note", async (req, res) => {
     try {
@@ -836,6 +1087,36 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
 
       const content = response.text || "Không tạo được nội dung bài học. Vui lòng thử lại.";
       await incrementUsage(usageKeyForReq);
+
+      // Tự động đề xuất bài mẫu chờ admin duyệt (không làm hỏng response nếu lỗi)
+      if (content.length > 50 && content !== "Không tạo được nội dung bài học. Vui lòng thử lại.") {
+        try {
+          const found = SUBJECTS.find(
+            (s: any) => s.name === subject || s.id === req.body.subjectId
+          );
+          await insertPendingPreset({
+            id: "pending-auto-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
+            type: "note",
+            title: String(lessonTitle).trim().slice(0, 150),
+            subject: String(subject).trim(),
+            subjectId: String(found?.id || req.body.subjectId || "").trim(),
+            textbook: textbook ? String(textbook).trim() : "Kết nối tri thức với cuộc sống",
+            content: content.slice(0, 20000),
+            date: new Date().toLocaleDateString("vi-VN", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }),
+            style: noteStyle || "standard",
+            author: "Bản soạn tự động",
+            source: "auto",
+            createdAt: new Date().toISOString(),
+          });
+        } catch (err: any) {
+          console.warn("[Pending] Không tự động đề xuất được bài mẫu:", err);
+        }
+      }
+
       res.json({ result: content });
     } catch (err: any) {
       console.error("Error generating lesson note:", err);
@@ -1044,31 +1325,42 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
 
-      const newItem: CommunityPresetItem = {
-        id: "community-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
+      const newItem: PendingPresetItem = {
+        id: "pending-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
         type: type === "exercise" ? "exercise" : "note",
-        title: String(title).trim(),
+        title: String(title).trim().slice(0, 150),
         subject: String(subject).trim(),
         subjectId: String(subjectId || "").trim(),
         textbook: String(textbook || "Kết nối tri thức với cuộc sống").trim(),
-        content: String(content),
+        content: String(content).slice(0, 20000),
         date: new Date().toLocaleDateString("vi-VN", {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
         }),
-        isFavorite: false,
         style: style || "standard",
         author: String(author || "Bạn ẩn danh").trim().slice(0, 60),
-        likes: 0,
+        source: "manual",
         createdAt: new Date().toISOString(),
-        fromCommunity: true,
       };
 
-      await insertPreset(newItem);
-      const items = await loadAllPresets();
+      const existing = await findExistingPreset(newItem.title, newItem.subject);
+      if (existing) {
+        return res.status(409).json({
+          error:
+            existing === "pending"
+              ? "Bài học này đã nằm trong hàng chờ duyệt rồi."
+              : "Bài học này đã có sẵn trong Kho bài mẫu.",
+        });
+      }
 
-      res.status(201).json({ item: newItem, total: items.length });
+      const saved = await insertPendingPreset(newItem);
+
+      res.status(201).json({
+        pending: true,
+        message: "Đã nhận bài mẫu. Admin sẽ duyệt trước khi đưa lên Kho chung!",
+        item: saved,
+      });
     } catch (err: any) {
       console.error("Error adding community preset:", err);
       res.status(500).json({ error: "Không thể đóng góp bài mẫu. Vui lòng thử lại." });

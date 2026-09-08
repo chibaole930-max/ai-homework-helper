@@ -859,7 +859,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
               )}
               {shared && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-semibold">
-                  Đã đăng! Bài mẫu của bạn đã có trong Kho bài mẫu chung.
+                  Đã gửi bài mẫu! Bài của bạn đang chờ admin duyệt rồi sẽ xuất hiện trong Kho bài mẫu chung.
                 </div>
               )}
             </div>

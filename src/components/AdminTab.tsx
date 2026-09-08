@@ -10,11 +10,29 @@ import {
   X,
   Check,
   ClipboardList,
+  Hourglass,
+  Eye,
+  Trash2,
 } from 'lucide-react';
 
 interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
+}
+
+interface PendingPresetItem {
+  id: string;
+  type: string;
+  title: string;
+  subject: string;
+  subjectId: string;
+  textbook: string;
+  content: string;
+  date: string;
+  style?: string;
+  author: string;
+  source: 'auto' | 'manual';
+  createdAt: string;
 }
 
 const TOKEN_KEY = 'admin_token';
@@ -32,9 +50,15 @@ export default function AdminTab() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const [pending, setPending] = useState<PendingPresetItem[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingBusy, setPendingBusy] = useState<string | null>(null);
+  const [pendingMsg, setPendingMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
+    setPendingLoading(true);
     fetch('/api/admin/settings', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -52,7 +76,57 @@ export default function AdminTab() {
       })
       .catch((err) => setSaveMsg({ ok: false, text: err.message }))
       .finally(() => setLoading(false));
+    fetch('/api/admin/pending', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Không tải được danh sách duyệt.');
+        const d = await r.json();
+        setPending(d.items || []);
+      })
+      .catch((err) =>
+        setPendingMsg({ ok: false, text: err.message || 'Không tải được.' })
+      )
+      .finally(() => setPendingLoading(false));
   }, [token]);
+
+  const handleApprovePending = async (id: string) => {
+    setPendingBusy(id);
+    setPendingMsg(null);
+    try {
+      const res = await fetch(`/api/admin/pending/${id}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không duyệt được.');
+      setPending(data.items || []);
+      setPendingMsg({ ok: true, text: data.message || 'Đã duyệt.' });
+    } catch (err: any) {
+      setPendingMsg({ ok: false, text: err.message || 'Không duyệt được.' });
+    } finally {
+      setPendingBusy(null);
+    }
+  };
+
+  const handleRejectPending = async (id: string) => {
+    setPendingBusy(id);
+    setPendingMsg(null);
+    try {
+      const res = await fetch(`/api/admin/pending/${id}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không bỏ được.');
+      setPending(data.items || []);
+      setPendingMsg({ ok: true, text: data.message || 'Đã bỏ bài.' });
+    } catch (err: any) {
+      setPendingMsg({ ok: false, text: err.message || 'Không bỏ được.' });
+    } finally {
+      setPendingBusy(null);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,6 +400,115 @@ export default function AdminTab() {
             báo sẽ hiện trên mọi trang trong ~60 giây.
           </span>
         </div>
+      </div>
+
+      {/* Duyệt bài mẫu chờ */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-violet-100 text-violet-600">
+              <Hourglass className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800">Duyệt Bài Mẫu Chờ</h2>
+              <p className="text-[11px] text-slate-500">
+                Bài soạn AI & chia sẻ thủ công chờ admin duyệt. Duyệt để đưa vào Kho chung.
+              </p>
+            </div>
+          </div>
+          {!pendingLoading && pending.length > 0 && (
+            <span className="px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-bold">
+              {pending.length} bài
+            </span>
+          )}
+        </div>
+
+        {pendingMsg && (
+          <div
+            className={`px-3 py-2 rounded-xl text-xs flex items-center gap-2 ${
+              pendingMsg.ok
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}
+          >
+            {pendingMsg.ok ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+            {pendingMsg.text}
+          </div>
+        )}
+
+        {pendingLoading ? (
+          <div className="py-6 flex justify-center text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        ) : pending.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400">
+            Không có bài nào đang chờ duyệt.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((item) => (
+              <div key={item.id} className="border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-slate-800 break-words">
+                      {item.title}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {item.subject}
+                      {item.textbook ? ` • ${item.textbook}` : ''}
+                      {item.style ? ` • ${item.style}` : ''} • {item.author} • {item.date}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      item.source === 'auto'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}
+                  >
+                    {item.source === 'auto' ? 'AI tự động' : 'Chia sẻ tay'}
+                  </span>
+                </div>
+
+                <details className="group">
+                  <summary className="cursor-pointer text-[11px] font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5" />
+                    Xem trước nội dung
+                  </summary>
+                  <div className="mt-2 bg-slate-50 rounded-lg p-2.5 text-[11px] text-slate-700 whitespace-pre-wrap max-h-60 overflow-auto leading-relaxed">
+                    {item.content.slice(0, 3000)}
+                    {item.content.length > 3000 ? (
+                      <span className="text-slate-400"> … (đã cắt hiển thị)</span>
+                    ) : null}
+                  </div>
+                </details>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => handleApprovePending(item.id)}
+                    disabled={pendingBusy === item.id}
+                    className="px-4 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white flex items-center gap-1.5"
+                  >
+                    {pendingBusy === item.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    Duyệt
+                  </button>
+                  <button
+                    onClick={() => handleRejectPending(item.id)}
+                    disabled={pendingBusy === item.id}
+                    className="px-4 py-1.5 text-xs font-bold rounded-xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-700 border border-red-200 flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Bỏ
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">

@@ -169,7 +169,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
         author: '',
         content: '',
       });
-      alert('Cảm ơn bạn! Bài mẫu đã được đưa vào kho chung để mọi người cùng xem.');
+      alert('Cảm ơn bạn! Bài mẫu đã được gửi và đang chờ admin duyệt trước khi vào Kho chung.');
     } catch (err: any) {
       alert(err.message || 'Không thể đóng góp. Vui lòng thử lại.');
     } finally {
