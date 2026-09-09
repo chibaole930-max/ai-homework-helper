@@ -2531,19 +2531,8 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
   });
 
   // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng) — chỉ dành cho VIP
-  app.get("/api/community/presets", async (req, res) => {
+  app.get("/api/community/presets", async (_req, res) => {
     try {
-      const auth = (req.headers.authorization || "").startsWith("Bearer ")
-        ? (req.headers.authorization || "").slice(7)
-        : "";
-      const userId = auth ? userTokens.get(auth) : undefined;
-      const user = userId ? await getUserById(userId) : null;
-      if (!user || !(await isVip(user))) {
-        return res.status(403).json({
-          error: "Kho bài mẫu dành cho tài khoản VIP. Nâng cấp để mở khóa.",
-          vipRequired: true,
-        });
-      }
       const items = await loadAllPresets();
       res.json({
         items,
