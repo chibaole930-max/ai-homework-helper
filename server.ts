@@ -476,21 +476,49 @@ async function rejectPendingPreset(id: string): Promise<boolean> {
 
 function getSiteGeminiApiKeys(): string[] {
   const keys: string[] = [];
-  const fromSettings = (cachedSiteSettings?.ai?.geminiKey || "").split(/[\n,;]+/);
-  for (const k of fromSettings) {
-    const trimmed = k.trim();
-    if (trimmed && !keys.includes(trimmed)) keys.push(trimmed);
+  const cfg: { geminiKey?: string; keys?: AiKeyConfig[] } = cachedSiteSettings?.ai || {};
+  if (Array.isArray(cfg.keys)) {
+    for (const k of cfg.keys) {
+      if (!k || !k.enabled) continue;
+      const t = (k.key || "").trim();
+      if (t && !keys.includes(t)) keys.push(t);
+    }
+  }
+  for (const part of parseGeminiKeyList(cfg.geminiKey)) {
+    if (!keys.includes(part)) keys.push(part);
   }
   const envKey = (process.env.GEMINI_API_KEY || "").trim();
   if (envKey && !keys.includes(envKey)) keys.push(envKey);
   return keys;
 }
 
+// Thống kê sử dụng từng key (theo bộ nhớ, reset khi server khởi động lại)
+const geminiKeyStats = new Map<
+  string,
+  { requests: number; successes: number; failures: number; lastError?: string; lastUsedAt?: number }
+>();
+
+function maskGeminiKey(key: string): string {
+  if (key.length <= 10) return key.slice(0, 2) + "***";
+  return key.slice(0, 4) + "****" + key.slice(-4);
+}
+
+function getGeminiKeyStatsFor(key: string) {
+  let s = geminiKeyStats.get(key);
+  if (!s) {
+    s = { requests: 0, successes: 0, failures: 0 };
+    geminiKeyStats.set(key, s);
+  }
+  return s;
+}
+
 let geminiRotationIndex = 0;
+
+type GeminiClientEntry = { client: GoogleGenAI; key: string };
 
 // Trả về danh sách các Gemini client (mỗi key 1 client), đã xoay vòng vị trí
 // bắt đầu để phân bổ tải đều giữa các key khi có nhiều key.
-function getGeminiClients(): GoogleGenAI[] {
+function getGeminiClients(): GeminiClientEntry[] {
   const keys = getSiteGeminiApiKeys();
   if (keys.length === 0) {
     throw new Error("GEMINI_API_KEY is not set in the environment.");
@@ -500,15 +528,18 @@ function getGeminiClients(): GoogleGenAI[] {
     ...keys.slice(0, geminiRotationIndex),
   ];
   geminiRotationIndex = (geminiRotationIndex + 1) % keys.length;
-  return rotated.map((apiKey) => {
-    return new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
+  return rotated.map((key) => {
+    return {
+      key,
+      client: new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
         },
-      },
-    });
+      }),
+    };
   });
 }
 
@@ -558,7 +589,7 @@ function parseGeminiErrorMessage(err: any): string {
 }
 
 async function generateContentWithFallback(
-  clients: GoogleGenAI[],
+  entries: GeminiClientEntry[],
   params: {
     contents: any;
     config?: any;
@@ -572,17 +603,20 @@ async function generateContentWithFallback(
   let lastError: any = null;
 
   // Lần lượt thử từng key (rotate từ đầu), với mỗi key sẽ chạy chuỗi dự phòng model.
-  for (let k = 0; k < clients.length; k++) {
-    const ai = clients[k];
+  for (let k = 0; k < entries.length; k++) {
+    const { client: ai, key } = entries[k];
+    const stat = getGeminiKeyStatsFor(key);
 
     for (let i = 0; i < models.length; i++) {
       const model = models[i];
       const maxAttempts = 2;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        stat.requests += 1;
+        stat.lastUsedAt = Date.now();
         try {
           console.log(
-            `[Gemini] key#${k + 1}/${clients.length} model ${model} (attempt ${attempt}/${maxAttempts})...`
+            `[Gemini] key#${k + 1}/${entries.length} ${maskGeminiKey(key)} model ${model} (attempt ${attempt}/${maxAttempts})...`
           );
           const response = await ai.models.generateContent({
             model,
@@ -591,16 +625,19 @@ async function generateContentWithFallback(
           });
 
           if (response && response.text) {
+            stat.successes += 1;
             console.log(
-              `[Gemini] Success with key#${k + 1}/${clients.length} model: ${model}`
+              `[Gemini] Success with key#${k + 1}/${entries.length} ${maskGeminiKey(key)} model: ${model}`
             );
             return response;
           }
         } catch (err: any) {
           lastError = err;
+          stat.failures += 1;
+          stat.lastError = parseGeminiErrorMessage(err).slice(0, 200);
           const errMsg = err?.message || String(err);
           console.warn(
-            `[Gemini] key#${k + 1}/${clients.length} model ${model} failed on attempt ${attempt}:`,
+            `[Gemini] key#${k + 1}/${entries.length} ${maskGeminiKey(key)} model ${model} failed on attempt ${attempt}:`,
             errMsg
           );
 
@@ -1261,19 +1298,73 @@ async function loadStatsOverview() {
 
 const SITE_SETTINGS_FILE = path.join(process.cwd(), "data", "site-settings.json");
 
+interface AiKeyConfig {
+  id: string;
+  name?: string;
+  key: string;
+  enabled: boolean;
+}
+
 interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
-  ai: { geminiKey: string };
+  ai: { geminiKey: string; keys: AiKeyConfig[] };
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   maintenance: { enabled: false, message: "" },
   announcement: { enabled: false, text: "" },
   donate: { enabled: false, qrImage: "", note: "" },
-  ai: { geminiKey: "" },
+  ai: { geminiKey: "", keys: [] },
 };
+
+function genKeyId(): string {
+  return `key_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function parseGeminiKeyList(input: any): string[] {
+  return String(input || "")
+    .split(/[\n,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Chuẩn hoá cấu hình AI khi đọc: gộp keys[] (quản lý mới) với chuỗi legacy geminiKey
+// (dấu phẩy/xuống dòng) thành danh sách keys hoàn chỉnh, không trùng key.
+function normalizeAiConfig(ai: any): { geminiKey: string; keys: AiKeyConfig[] } {
+  const keys: AiKeyConfig[] = [];
+  const seen = new Set<string>();
+  const pushKey = (
+    id: string | undefined,
+    name: string | undefined,
+    key: string,
+    enabled: boolean
+  ) => {
+    const trimmed = String(key || "").trim().slice(0, 300);
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    keys.push({
+      id: String(id || genKeyId()).slice(0, 40),
+      name: (name || "").trim().slice(0, 60) || undefined,
+      key: trimmed,
+      enabled: !!enabled,
+    });
+  };
+  if (ai && Array.isArray(ai.keys)) {
+    for (const k of ai.keys) {
+      if (k && typeof k === "object") pushKey(k.id, k.name, k.key, k.enabled);
+    }
+  }
+  for (const part of parseGeminiKeyList(ai?.geminiKey)) pushKey(undefined, undefined, part, true);
+  return {
+    geminiKey: keys
+      .filter((k) => k.enabled)
+      .map((k) => k.key)
+      .join("\n"),
+    keys,
+  };
+}
 
 let cachedSiteSettings: SiteSettings | null = null;
 
@@ -1301,9 +1392,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
             qrImage: String(parsed.donate?.qrImage || ""),
             note: String(parsed.donate?.note || ""),
           },
-          ai: {
-            geminiKey: String(parsed.ai?.geminiKey || ""),
-          },
+          ai: normalizeAiConfig(parsed.ai),
         };
         return cachedSiteSettings;
       }
@@ -1328,9 +1417,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
             qrImage: String(parsed.donate?.qrImage || ""),
             note: String(parsed.donate?.note || ""),
           },
-          ai: {
-            geminiKey: String(parsed.ai?.geminiKey || ""),
-          },
+          ai: normalizeAiConfig(parsed.ai),
         };
       return cachedSiteSettings;
     }
@@ -1341,7 +1428,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
     maintenance: { enabled: false, message: "" },
     announcement: { enabled: false, text: "" },
     donate: { enabled: false, qrImage: "", note: "" },
-    ai: { geminiKey: "" },
+    ai: { geminiKey: "", keys: [] },
   };
   return cachedSiteSettings;
 }
@@ -1522,7 +1609,8 @@ async function startServer() {
   // API: Xem cài đặt (admin)
   app.get("/api/admin/settings", requireAdmin, async (_req, res) => {
     try {
-      res.json(await readSiteSettings());
+      const settings = await readSiteSettings();
+      res.json({ ...settings, ai: normalizeAiConfig(settings.ai) });
     } catch (err: any) {
       console.error("Error reading admin settings:", err);
       res.status(500).json({ error: "Không đọc được cài đặt." });
@@ -1535,6 +1623,29 @@ async function startServer() {
       const { maintenance, announcement, donate } = req.body || {};
       const current = await readSiteSettings();
       const rawQr = String(donate?.qrImage ?? current.donate.qrImage).trim();
+
+      // --- Xử lý danh sách API key AI ---
+      const aiIn = req.body?.ai || {};
+      const rawKeys: AiKeyConfig[] = Array.isArray(aiIn.keys)
+        ? aiIn.keys.slice(0, 50)
+        : parseGeminiKeyList(aiIn.geminiKey).map((g) => {
+            return { id: genKeyId(), name: undefined, key: g, enabled: true };
+          });
+      const aiKeys: AiKeyConfig[] = [];
+      const aiSeen = new Set<string>();
+      for (const k of rawKeys) {
+        if (!k || typeof k !== "object") continue;
+        const key = String(k.key || "").trim().slice(0, 300);
+        if (!key || aiSeen.has(key)) continue;
+        aiSeen.add(key);
+        aiKeys.push({
+          id: String(k.id || genKeyId()).slice(0, 40),
+          name: String(k.name || "").trim().slice(0, 60) || undefined,
+          key,
+          enabled: !!k.enabled,
+        });
+      }
+
       const next: SiteSettings = {
         maintenance: {
           enabled:
@@ -1560,9 +1671,11 @@ async function startServer() {
           note: String(donate?.note ?? current.donate.note).slice(0, 500),
         },
         ai: {
-          geminiKey: String(req.body?.ai?.geminiKey ?? current.ai.geminiKey)
-            .trim()
-            .slice(0, 500),
+          geminiKey: aiKeys
+            .filter((k) => k.enabled)
+            .map((k) => k.key)
+            .join("\n"),
+          keys: aiKeys,
         },
       };
       await writeSiteSettings(next);
@@ -1570,6 +1683,23 @@ async function startServer() {
     } catch (err: any) {
       console.error("Admin update failed:", err);
       res.status(500).json({ error: "Không lưu được cài đặt." });
+    }
+  });
+
+  // API: Thống kê sử dụng từng API key AI (admin)
+  app.get("/api/admin/ai-stats", requireAdmin, (_req, res) => {
+    try {
+      const stats = Array.from(geminiKeyStats.entries()).map(([key, s]) => ({
+        key: maskGeminiKey(key),
+        ...s,
+      }));
+      res.json({
+        stats,
+        activeKeys: getSiteGeminiApiKeys().map((k) => maskGeminiKey(k)),
+      });
+    } catch (err: any) {
+      console.error("Error reading AI key stats:", err);
+      res.status(500).json({ error: "Không đọc được thống kê." });
     }
   });
 
