@@ -445,6 +445,17 @@ async function approvePendingPreset(id: string): Promise<boolean> {
   return true;
 }
 
+// Admin duyệt TẤT CẢ bài chờ: duyệt lần lượt từng bài. Trả về số bài đã duyệt.
+async function approveAllPendingPresets(): Promise<number> {
+  const list = await loadPendingPresets();
+  let approved = 0;
+  for (const item of list) {
+    const ok = await approvePendingPreset(item.id);
+    if (ok) approved++;
+  }
+  return approved;
+}
+
 async function rejectPendingPreset(id: string): Promise<boolean> {
   if (pgPool) {
     try {
@@ -1175,6 +1186,24 @@ async function startServer() {
     } catch (err: any) {
       console.error("Error loading pending presets:", err);
       res.status(500).json({ error: "Không tải được danh sách chờ duyệt." });
+    }
+  });
+
+  // API: Duyệt TẤT CẢ bài mẫu chờ (admin) — đặt trước route :id để không bị nuốt
+  app.post("/api/admin/pending/approve-all", requireAdmin, async (_req, res) => {
+    try {
+      const approved = await approveAllPendingPresets();
+      const items = await loadPendingPresets();
+      res.json({
+        ok: true,
+        message: `Đã duyệt tất cả ${approved} bài mẫu vào Kho chung.`,
+        items,
+        total: items.length,
+        approved,
+      });
+    } catch (err: any) {
+      console.error("Error approving all pending presets:", err);
+      res.status(500).json({ error: "Không duyệt được toàn bộ bài mẫu." });
     }
   });
 

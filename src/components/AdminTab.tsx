@@ -17,6 +17,7 @@ import {
   Users,
   HeartHandshake,
   ImagePlus,
+  CheckCheck,
 } from 'lucide-react';
 
 interface SiteSettings {
@@ -178,6 +179,33 @@ export default function AdminTab() {
       setPendingMsg({ ok: true, text: data.message || 'Đã bỏ bài.' });
     } catch (err: any) {
       setPendingMsg({ ok: false, text: err.message || 'Không bỏ được.' });
+    } finally {
+      setPendingBusy(null);
+    }
+  };
+
+  const handleApproveAllPending = async () => {
+    if (pending.length === 0) return;
+    if (
+      !window.confirm(
+        `Duyệt toàn bộ ${pending.length} bài mẫu chờ và đưa vào Kho chung ngay lập tức?`
+      )
+    ) {
+      return;
+    }
+    setPendingBusy('all');
+    setPendingMsg(null);
+    try {
+      const res = await fetch('/api/admin/pending/approve-all', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không duyệt được.');
+      setPending(data.items || []);
+      setPendingMsg({ ok: true, text: data.message || 'Đã duyệt tất cả.' });
+    } catch (err: any) {
+      setPendingMsg({ ok: false, text: err.message || 'Không duyệt được.' });
     } finally {
       setPendingBusy(null);
     }
@@ -720,11 +748,27 @@ export default function AdminTab() {
               </p>
             </div>
           </div>
-          {!pendingLoading && pending.length > 0 && (
-            <span className="px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-bold">
-              {pending.length} bài
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {!pendingLoading && pending.length > 0 && (
+              <>
+                <button
+                  onClick={handleApproveAllPending}
+                  disabled={pendingBusy === 'all' || pendingBusy !== null}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white flex items-center gap-1.5"
+                >
+                  {pendingBusy === 'all' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCheck className="w-3.5 h-3.5" />
+                  )}
+                  Duyệt tất cả
+                </button>
+                <span className="px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-bold">
+                  {pending.length} bài
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         {pendingMsg && (
