@@ -752,11 +752,13 @@ const LICENSE_KEYS_FILE = path.join(process.cwd(), "data", "license-keys.json");
 const VIP_ORDERS_FILE = path.join(process.cwd(), "data", "vip-orders.json");
 
 const PLAN_DURATIONS: Record<string, number> = {
+  "24h": 1,
   "1m": 30,
   "3m": 90,
   "1y": 365,
 };
 const PLAN_LABELS: Record<string, string> = {
+  "24h": "24 giờ",
   "1m": "1 tháng",
   "3m": "3 tháng",
   "1y": "1 năm",
@@ -1709,7 +1711,7 @@ async function startServer() {
       res.json({
         ok: true,
         user: publicUser(user, vip),
-        message: `Đã kích hoạt ${PLAN_LABELS[key.plan]} VIP (${key.days} ngày) cho tài khoản ${user.email}!`,
+        message: `Đã kích hoạt gói VIP ${PLAN_LABELS[key.plan]} cho tài khoản ${user.email}!`,
         vipUntil: user.vipUntil,
       });
     } catch (err: any) {
@@ -1727,7 +1729,7 @@ async function startServer() {
       if (!(plan in PLAN_DURATIONS)) {
         return res.status(400).json({ error: "Loại gói không hợp lệ." });
       }
-      const prefix = plan === "1m" ? "VIP1" : plan === "3m" ? "VIP3" : "VIP12";
+      const prefix = plan === "24h" ? "GWP" : plan === "1m" ? "VIP1" : plan === "3m" ? "VIP3" : "VIP12";
       const codes = generateLicenseCodes(count, prefix);
       const now = new Date().toISOString();
       const newKeys: LicenseKeyRecord[] = codes.map((code) => ({

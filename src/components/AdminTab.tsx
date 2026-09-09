@@ -98,7 +98,7 @@ export default function AdminTab() {
     { code: string; plan: string; days: number; status: string; note: string; usedByEmail: string | null; usedAt: string | null; createdAt: string }[] | null
   >(null);
   const [vipKeysLoading, setVipKeysLoading] = useState(false);
-  const [genPlan, setGenPlan] = useState<'1m' | '3m' | '1y'>('1m');
+  const [genPlan, setGenPlan] = useState<'24h' | '1m' | '3m' | '1y'>('1m');
   const [genCount, setGenCount] = useState(1);
   const [genNote, setGenNote] = useState('');
   const [genBusy, setGenBusy] = useState(false);
@@ -1080,11 +1080,11 @@ export default function AdminTab() {
                     </td>
                     <td className="py-2 pr-2 whitespace-nowrap">
                       <span className="text-amber-700 font-bold">
-                        {o.plan === '1m' ? '1 Tháng' : o.plan === '3m' ? '3 Tháng' : '1 Năm'}
+                        {o.plan === '24h' ? '24 Giờ' : o.plan === '1m' ? '1 Tháng' : o.plan === '3m' ? '3 Tháng' : '1 Năm'}
                       </span>
                       <span className="text-slate-400">
                         {' '}
-                        {o.plan === '1m' ? '49.000đ' : o.plan === '3m' ? '119.000đ' : '399.000đ'}
+                        {o.plan === '1m' ? '49.000đ' : o.plan === '3m' ? '119.000đ' : o.plan === '1y' ? '399.000đ' : ''}
                       </span>
                     </td>
                     <td className="py-2 pr-2">
@@ -1163,7 +1163,7 @@ export default function AdminTab() {
             <div>
               <label className="text-[10px] font-bold text-slate-500 block mb-1">Gói</label>
               <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-white">
-                {(['1m', '3m', '1y'] as const).map((p) => (
+                {(['24h', '1m', '3m', '1y'] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => setGenPlan(p)}
@@ -1171,7 +1171,7 @@ export default function AdminTab() {
                       genPlan === p ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-amber-50'
                     }`}
                   >
-                    {p === '1m' ? '1 Tháng' : p === '3m' ? '3 Tháng' : '1 Năm'}
+                    {p === '24h' ? '24 Giờ' : p === '1m' ? '1 Tháng' : p === '3m' ? '3 Tháng' : '1 Năm'}
                   </button>
                 ))}
               </div>
@@ -1302,7 +1302,7 @@ export default function AdminTab() {
                       </td>
                       <td className="py-2 pr-2 whitespace-nowrap">
                         <span className="text-amber-700 font-bold">
-                          {k.plan === '1m' ? '1 Tháng' : k.plan === '3m' ? '3 Tháng' : '1 Năm'}
+                          {k.plan === '24h' ? '24 Giờ' : k.plan === '1m' ? '1 Tháng' : k.plan === '3m' ? '3 Tháng' : '1 Năm'}
                         </span>{' '}
                         <span className="text-slate-400">{k.days} ngày</span>
                       </td>
