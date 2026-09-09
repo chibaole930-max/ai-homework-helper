@@ -23,9 +23,30 @@ const ANNOUNCE_KEY = 'announcement_dismissed_v1';
 const DONATE_SESSION_KEY = 'donate_shown_session_v1';
 
 interface SiteStatus {
-  maintenance: { enabled: boolean; message: string };
+  maintenance: {
+    enabled: boolean;
+    message: string;
+    modules?: { note?: boolean; solver?: boolean; presets?: boolean };
+  };
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
+}
+
+function ModuleMaintenancePanel({ message }: { message: string }) {
+  return (
+    <div className="max-w-md mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4 mt-6">
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 mx-auto">
+        <Wrench className="w-6 h-6" />
+      </div>
+      <h2 className="text-lg font-extrabold text-slate-900">Mục Này Đang Bảo Trì</h2>
+      <p className="text-sm text-slate-500 leading-relaxed">
+        {message || 'Chúng tôi đang nâng cấp hạng mục này. Vui lòng quay lại sau nhé!'}
+      </p>
+      <p className="text-[11px] text-slate-400">
+        Vở Ghi của bạn và các mục khác vẫn dùng bình thường.
+      </p>
+    </div>
+  );
 }
 
 function AppContent() {
@@ -315,36 +336,45 @@ function AppContent() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {activeTab === 'notes' && (
-          <LessonNoteTab
-            onSaveNote={handleSaveItem}
-            isItemSaved={isItemSaved}
-            subjects={subjects}
-            textbooks={textbooks}
-            gradeLabel={gradeLabel}
-            grade={grade}
-          />
-        )}
+        {activeTab === 'notes' &&
+          (siteStatus?.maintenance?.modules?.note ? (
+            <ModuleMaintenancePanel message={siteStatus.maintenance.message} />
+          ) : (
+            <LessonNoteTab
+              onSaveNote={handleSaveItem}
+              isItemSaved={isItemSaved}
+              subjects={subjects}
+              textbooks={textbooks}
+              gradeLabel={gradeLabel}
+              grade={grade}
+            />
+          ))}
 
-        {activeTab === 'solver' && (
-          <ExerciseSolverTab
-            onSaveExercise={handleSaveItem}
-            isItemSaved={isItemSaved}
-            subjects={subjects}
-            gradeLabel={gradeLabel}
-            grade={grade}
-          />
-        )}
+        {activeTab === 'solver' &&
+          (siteStatus?.maintenance?.modules?.solver ? (
+            <ModuleMaintenancePanel message={siteStatus.maintenance.message} />
+          ) : (
+            <ExerciseSolverTab
+              onSaveExercise={handleSaveItem}
+              isItemSaved={isItemSaved}
+              subjects={subjects}
+              gradeLabel={gradeLabel}
+              grade={grade}
+            />
+          ))}
 
-        {activeTab === 'presets' && (
-          <PresetLibraryTab
-            onImportPreset={handleImportPreset}
-            isItemSaved={isItemSaved}
-            subjects={subjects}
-            gradeLabel={gradeLabel}
-            grade={grade}
-          />
-        )}
+        {activeTab === 'presets' &&
+          (siteStatus?.maintenance?.modules?.presets ? (
+            <ModuleMaintenancePanel message={siteStatus.maintenance.message} />
+          ) : (
+            <PresetLibraryTab
+              onImportPreset={handleImportPreset}
+              isItemSaved={isItemSaved}
+              subjects={subjects}
+              gradeLabel={gradeLabel}
+              grade={grade}
+            />
+          ))}
 
         {activeTab === 'saved' && (
           <SavedNotesTab

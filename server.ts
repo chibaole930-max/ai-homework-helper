@@ -1374,18 +1374,34 @@ interface AiKeyConfig {
 }
 
 interface SiteSettings {
-  maintenance: { enabled: boolean; message: string };
+  maintenance: {
+    enabled: boolean;
+    message: string;
+    modules: { note?: boolean; solver?: boolean; presets?: boolean };
+  };
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
   ai: { geminiKey: string; keys: AiKeyConfig[] };
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
-  maintenance: { enabled: false, message: "" },
+  maintenance: { enabled: false, message: "", modules: {} },
   announcement: { enabled: false, text: "" },
   donate: { enabled: false, qrImage: "", note: "" },
   ai: { geminiKey: "", keys: [] },
 };
+
+function normalizeMaintenanceModules(m: any): {
+  note: boolean;
+  solver: boolean;
+  presets: boolean;
+} {
+  return {
+    note: !!m?.note,
+    solver: !!m?.solver,
+    presets: !!m?.presets,
+  };
+}
 
 function genKeyId(): string {
   return `key_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -1453,6 +1469,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
           maintenance: {
             enabled: !!parsed.maintenance?.enabled,
             message: String(parsed.maintenance?.message || ""),
+            modules: normalizeMaintenanceModules(parsed.maintenance?.modules),
           },
           announcement: {
             enabled: !!parsed.announcement?.enabled,
@@ -1478,6 +1495,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
           maintenance: {
             enabled: !!parsed.maintenance?.enabled,
             message: String(parsed.maintenance?.message || ""),
+            modules: normalizeMaintenanceModules(parsed.maintenance?.modules),
           },
           announcement: {
             enabled: !!parsed.announcement?.enabled,
@@ -1496,7 +1514,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
     // ignore
   }
   cachedSiteSettings = {
-    maintenance: { enabled: false, message: "" },
+    maintenance: { enabled: false, message: "", modules: {} },
     announcement: { enabled: false, text: "" },
     donate: { enabled: false, qrImage: "", note: "" },
     ai: { geminiKey: "", keys: [] },
@@ -1530,6 +1548,16 @@ async function writeSiteSettings(settings: SiteSettings) {
 async function getMaintenanceMessage(): Promise<string> {
   const s = await readSiteSettings();
   return s.maintenance.enabled ? s.maintenance.message : "";
+}
+
+// Bảo trì cho riêng 1 hạng mục: bật nếu maintenance toàn web HOẶC module đó.
+async function getMaintenanceMessageFor(
+  section: "note" | "solver" | "presets"
+): Promise<string> {
+  const s = await readSiteSettings();
+  if (s.maintenance.enabled) return s.maintenance.message;
+  if (s.maintenance.modules?.[section]) return s.maintenance.message;
+  return "";
 }
 
 const adminTokens = new Map<string, number>();
@@ -1728,6 +1756,10 @@ async function startServer() {
               ? current.maintenance.enabled
               : !!maintenance.enabled,
           message: String(maintenance?.message ?? current.maintenance.message).slice(0, 500),
+          modules:
+            maintenance?.modules === undefined
+              ? current.maintenance.modules
+              : normalizeMaintenanceModules(maintenance?.modules),
         },
         announcement: {
           enabled:
@@ -2208,8 +2240,8 @@ async function startServer() {
         return res.status(400).json({ error: "Thiếu thông tin môn học hoặc tên bài học." });
       }
 
-      // Chế độ bảo trì: khóa AI
-      const maintenanceMsg = await getMaintenanceMessage();
+      // Chế độ bảo trì: khóa AI (Soạn bài)
+      const maintenanceMsg = await getMaintenanceMessageFor("note");
       if (maintenanceMsg) {
         return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
@@ -2377,8 +2409,8 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
         return res.status(400).json({ error: "Vui lòng nhập đề bài hoặc tải ảnh chụp bài tập." });
       }
 
-      // Chế độ bảo trì: khóa AI
-      const maintenanceMsg = await getMaintenanceMessage();
+      // Chế độ bảo trì: khóa AI (Giải bài)
+      const maintenanceMsg = await getMaintenanceMessageFor("solver");
       if (maintenanceMsg) {
         return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
@@ -2492,6 +2524,12 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
 
       const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
 
+      // Chế độ bảo trì: khóa AI (Giải bài / Hỏi đáp)
+      const maintenanceMsg = await getMaintenanceMessageFor("solver");
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
+      }
+
       // Giới hạn lượt AI miễn phí (VIP không giới hạn)
       if (!(await checkAiUsageLimit(req, res))) return;
 
@@ -2530,9 +2568,14 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
     }
   });
 
-  // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng) — chỉ dành cho VIP
+  // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng) — mở công khai
   app.get("/api/community/presets", async (_req, res) => {
     try {
+      // Chế độ bảo trì: khóa xem Kho bài mẫu
+      const maintenanceMsg = await getMaintenanceMessageFor("presets");
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
+      }
       const items = await loadAllPresets();
       res.json({
         items,
@@ -2566,7 +2609,7 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
       }
 
       // Chế độ bảo trì: khóa đóng góp bài mẫu
-      const maintenanceMsg = await getMaintenanceMessage();
+      const maintenanceMsg = await getMaintenanceMessageFor("presets");
       if (maintenanceMsg) {
         return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }

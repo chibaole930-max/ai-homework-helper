@@ -42,7 +42,11 @@ interface AiKeyConfig {
 }
 
 interface SiteSettings {
-  maintenance: { enabled: boolean; message: string };
+  maintenance: {
+    enabled: boolean;
+    message: string;
+    modules?: { note?: boolean; solver?: boolean; presets?: boolean };
+  };
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
   ai: { geminiKey: string; keys: AiKeyConfig[] };
@@ -710,6 +714,56 @@ export default function AdminTab() {
             placeholder="VD: Hệ thống đang nâng cấp, vui lòng quay lại lúc 14h."
             className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none"
           />
+        </div>
+
+        <div className="border-t border-slate-100 pt-3 space-y-2.5">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+            Bảo trì riêng từng hạng mục
+          </p>
+          {(
+            [
+              ['note', 'Soạn Bài AI', 'Khóa /api/lesson-note, tab Soạn Bài hiện thông báo bảo trì'],
+              ['solver', 'Giải Bài AI & Hỏi đáp', 'Khóa /api/solve-exercise + /api/tutor-followup, tab Giải Bài hiện thông báo'],
+              ['presets', 'Kho Bài Mẫu', 'Khóa xem & đóng góp bài mẫu, tab Kho Bài Mẫu hiện thông báo'],
+            ] as const
+          ).map(([key, label, hint]) => (
+            <div
+              key={key}
+              className="flex items-center justify-between gap-3 py-1"
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-700">{label}</p>
+                <p className="text-[11px] text-slate-400">{hint}</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={!!settings?.maintenance.modules?.[key]}
+                  onChange={(e) =>
+                    setSettings((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            maintenance: {
+                              ...prev.maintenance,
+                              modules: {
+                                ...(prev.maintenance.modules || {}),
+                                [key]: e.target.checked,
+                              },
+                            },
+                          }
+                        : prev
+                    )
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-amber-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:border-slate-200 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+              </label>
+            </div>
+          ))}
+          <p className="text-[11px] text-slate-400 pt-0.5">
+            Bật độc lập, không cần bật "Chế độ bảo trì" toàn web. Vở Ghi của học sinh luôn hoạt động.
+          </p>
         </div>
       </div>
 
