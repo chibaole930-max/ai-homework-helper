@@ -88,6 +88,7 @@ export interface SavedStudyItem {
   style?: string;
   originalProblem?: string;
   hasImage?: boolean;
+  grade?: string;
 }
 
 export interface TutorMessage {

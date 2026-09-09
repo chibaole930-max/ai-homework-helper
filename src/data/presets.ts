@@ -11,6 +11,7 @@ export const PRESET_LESSON_NOTES: SavedStudyItem[] = [
     date: 'Học kỳ 1 - Lớp 12',
     isFavorite: true,
     style: 'standard',
+    grade: '12',
     content: `## 📌 BÀI SOẠN: KHẢO SÁT SỰ BIẾN THIÊN VÀ VẼ ĐỒ THỊ HÀM SỐ
 
 ### I. MỤC TIÊU BÀI HỌC
@@ -67,6 +68,7 @@ export const PRESET_LESSON_NOTES: SavedStudyItem[] = [
     date: 'Học kỳ 1 - Lớp 12',
     isFavorite: true,
     style: 'standard',
+    grade: '12',
     content: `## 📌 BÀI SOẠN: ĐẤT NƯỚC (NGUYỄN KHOA ĐIỀM)
 
 ### I. TÌM HIỂU CHUNG
@@ -118,6 +120,7 @@ $\\implies$ **Nhận xét**: Nguyễn Khoa Điềm đã sử dụng nhuần nhuy
     textbook: 'Cánh diều',
     date: 'Luyện đề',
     isFavorite: false,
+    grade: '12',
     originalProblem: 'Một bình kín có dung tích 20 lít chứa khí Nitơ ở áp suất 10 atm và nhiệt độ 27°C. Do van bị hở, một lượng khí đã thoát ra ngoài. Khi kiểm tra lại, áp suất chỉ còn 6 atm ở nhiệt độ 17°C. Coi khí Nitơ là khí lí tưởng có khối lượng mol M = 28 g/mol. Tính khối lượng khí đã thoát ra khỏi bình.',
     content: `### 📌 LỜI GIẢI CHI TIẾT
 

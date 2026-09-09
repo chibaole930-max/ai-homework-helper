@@ -24,6 +24,7 @@ import {
 interface CommunityPreset extends SavedStudyItem {
   author?: string;
   likes?: number;
+  views?: number;
   fromCommunity?: boolean;
 }
 
@@ -31,7 +32,6 @@ interface PresetLibraryTabProps {
   onImportPreset: (item: SavedStudyItem) => void;
   isItemSaved: (title: string, subject: string) => boolean;
   subjects: SubjectInfo[];
-  gradeLabel: string;
   grade: GradeId;
 }
 
@@ -39,10 +39,10 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
   onImportPreset,
   isItemSaved,
   subjects,
-  gradeLabel,
   grade,
 }) => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [activeItem, setActiveItem] = useState<CommunityPreset | null>(null);
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<CommunityPreset[]>(PRESET_LESSON_NOTES as CommunityPreset[]);
@@ -57,6 +57,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     textbook: 'Kết nối tri thức với cuộc sống',
     title: '',
     author: '',
+    grade: (grade || '12') as string,
     content: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -86,6 +87,9 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     if (selectedSubject !== 'all' && item.subjectId !== selectedSubject) {
       return false;
     }
+    if (selectedGrade !== 'all' && item.grade !== selectedGrade) {
+      return false;
+    }
     if (
       searchQuery &&
       !item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -94,6 +98,16 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     }
     return true;
   });
+
+  const openReader = (item: CommunityPreset) => {
+    const updated = { ...item, views: (item.views || 0) + 1 };
+    setActiveItem(updated);
+    setItems((prev) => prev.map((p) => (p.id === item.id ? updated : p)));
+    fetch(`/api/community/presets/${item.id}/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => {});
+  };
 
   const handleImport = (item: CommunityPreset) => {
     onImportPreset({
@@ -161,7 +175,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
           title: contributeForm.title,
           content: contributeForm.content,
           author: contributeForm.author,
-          grade,
+          grade: contributeForm.grade,
         }),
       });
       if (!res.ok) {
@@ -175,6 +189,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
         textbook: 'Kết nối tri thức với cuộc sống',
         title: '',
         author: '',
+        grade: '12',
         content: '',
       });
       alert('Cảm ơn bạn! Bài mẫu đã được gửi và đang chờ admin duyệt trước khi vào Kho chung.');
@@ -199,11 +214,11 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
             <span>Kho Học Liệu Mẫu Chuẩn GDPT 2018 - Đồng bộ cộng đồng</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
-            Thư Viện Bài Soạn & Lời Giải Mẫu {gradeLabel} (dùng chung cả 3 khối)
+            Thư Viện Bài Soạn & Lời Giải Mẫu cho Lớp 10, 11, 12
           </h1>
           <p className="text-emerald-100 text-sm sm:text-base leading-relaxed">
-            Kho bài mẫu dùng chung cho tất cả mọi người sử dụng web! Bạn có thể đọc ngay,
-            lưu vào Vở ghi, bày tỏ thích, và <span className="font-semibold text-white">đóng góp bài mẫu của riêng mình</span> để đồng bộ cho cộng đồng.
+            Kho bài mẫu dùng chung cho tất cả mọi người sử dụng web, phân chia theo khối lớp!
+            Bạn có thể lọc lớp 10 / 11 / 12, đọc ngay, lưu vào Vở ghi, bày tỏ thích, và <span className="font-semibold text-white">đóng góp bài mẫu của riêng mình</span> để đồng bộ cho cộng đồng.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/15">
@@ -231,8 +246,34 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
         <div className="absolute right-0 -bottom-10 w-72 h-72 bg-white/10 rounded-full blur-2xl pointer-events-none" />
       </div>
 
-      {/* Filter by Subject & Search */}
+      {/* Filter by Class, Subject & Search */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 whitespace-nowrap">
+            Chọn lớp:
+          </span>
+          {(
+            [
+              ['all', 'Tất cả lớp'],
+              ['10', 'Lớp 10'],
+              ['11', 'Lớp 11'],
+              ['12', 'Lớp 12'],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setSelectedGrade(val)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                selectedGrade === val
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 whitespace-nowrap">
             Chọn môn:
@@ -309,27 +350,34 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {item.subject}
                     </span>
-                    {item.fromCommunity ? (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-0.5">
-                        <Sparkles className="w-3 h-3" />
-                        Cộng đồng
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold text-slate-400">
-                        {item.textbook}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {item.grade && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
+                          Lớp {item.grade}
+                        </span>
+                      )}
+                      {item.fromCommunity ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-0.5">
+                          <Sparkles className="w-3 h-3" />
+                          Cộng đồng
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          {item.textbook}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <h3
-                    onClick={() => setActiveItem(item)}
+                    onClick={() => openReader(item)}
                     className="font-bold text-base text-slate-900 line-clamp-2 hover:text-emerald-700 cursor-pointer transition-colors"
                   >
                     {item.title}
                   </h3>
 
                   <p
-                    onClick={() => setActiveItem(item)}
+                    onClick={() => openReader(item)}
                     className="text-xs text-slate-500 line-clamp-3 leading-relaxed cursor-pointer font-serif"
                   >
                     {item.content.replace(/#|\*|`|>|\[|\]/g, '').slice(0, 160)}...
@@ -344,22 +392,28 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
                         {item.author || 'Kho Học Liệu Mẫu'}
                       </span>
                     </span>
-                    <button
-                      onClick={() => handleLike(item)}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold transition-colors ${
-                        isLiked
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
-                      }`}
-                    >
-                      <ThumbsUp className="w-3 h-3" />
-                      {item.likes || 0}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500">
+                        <Eye className="w-3 h-3" />
+                        {item.views || 0}
+                      </span>
+                      <button
+                        onClick={() => handleLike(item)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold transition-colors ${
+                          isLiked
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
+                        }`}
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                        {item.likes || 0}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <button
-                      onClick={() => setActiveItem(item)}
+                      onClick={() => openReader(item)}
                       className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
                     >
                       <Eye className="w-3.5 h-3.5" />
@@ -404,12 +458,21 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                   {activeItem.subject}
                 </span>
+                {activeItem.grade && (
+                  <span className="ml-1.5 text-xs font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                    Lớp {activeItem.grade}
+                  </span>
+                )}
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-1">
                   {activeItem.title}
                 </h2>
                 <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-500">
                   <span>
                     Bởi <b>{activeItem.author || 'Kho Học Liệu Mẫu'}</b>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="w-3 h-3" />
+                    {activeItem.views || 0} lượt xem
                   </span>
                   <button
                     onClick={() => handleLike(activeItem)}
@@ -492,6 +555,26 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1">
                     Sẽ gắn môn: {contributeSelectedSubjectName}
                   </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">
+                    Khối lớp *
+                  </label>
+                  <select
+                    value={contributeForm.grade}
+                    onChange={(e) =>
+                      setContributeForm((f) => ({
+                        ...f,
+                        grade: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none"
+                  >
+                    <option value="10">Lớp 10</option>
+                    <option value="11">Lớp 11</option>
+                    <option value="12">Lớp 12</option>
+                  </select>
                 </div>
 
                 <div>

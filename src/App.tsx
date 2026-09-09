@@ -371,7 +371,6 @@ function AppContent() {
               onImportPreset={handleImportPreset}
               isItemSaved={isItemSaved}
               subjects={subjects}
-              gradeLabel={gradeLabel}
               grade={grade}
             />
           ))}

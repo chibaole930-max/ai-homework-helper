@@ -31,6 +31,8 @@ interface CommunityPresetItem {
   style?: string;
   author: string;
   likes: number;
+  views: number;
+  grade?: string;
   createdAt: string;
   fromCommunity?: boolean;
 }
@@ -65,6 +67,8 @@ function rowToPreset(row: any): CommunityPresetItem {
     style: row.style || undefined,
     author: row.author,
     likes: row.likes,
+    views: Number(row.views || 0),
+    grade: row.grade || undefined,
     createdAt: row.createdAt instanceof Date
       ? row.createdAt.toISOString()
       : String(row.createdAt),
@@ -88,6 +92,8 @@ async function ensureCommunityTable(pool: Pool) {
       style TEXT,
       author TEXT NOT NULL DEFAULT 'Kho Học Liệu Mẫu',
       likes INTEGER NOT NULL DEFAULT 0,
+      views INTEGER NOT NULL DEFAULT 0,
+      grade TEXT,
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
       "fromCommunity" BOOLEAN NOT NULL DEFAULT false
     )
@@ -123,10 +129,15 @@ async function ensureCommunityTable(pool: Pool) {
       style TEXT,
       author TEXT NOT NULL DEFAULT 'Kho Học Liệu Mẫu',
       likes INTEGER NOT NULL DEFAULT 0,
+      views INTEGER NOT NULL DEFAULT 0,
+      grade TEXT,
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
       "fromCommunity" BOOLEAN NOT NULL DEFAULT false
     )
   `);
+  // Bảng đã tồn tại từ phiên bản cũ (thiếu grade/views) thì bổ sung cột.
+  await pool.query(`ALTER TABLE community_presets ADD COLUMN IF NOT EXISTS views INTEGER NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE community_presets ADD COLUMN IF NOT EXISTS grade TEXT`).catch(() => {});
   const { rows } = await pool.query(
     "SELECT COUNT(*)::int AS c FROM community_presets"
   );
@@ -134,8 +145,8 @@ async function ensureCommunityTable(pool: Pool) {
     for (const p of PRESET_LESSON_NOTES) {
       await pool.query(
         `INSERT INTO community_presets
-           (id, type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, author, likes, "fromCommunity")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,false)
+           (id, type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, author, likes, views, grade, "fromCommunity")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,0,$12,false)
          ON CONFLICT (id) DO NOTHING`,
         [
           p.id,
@@ -149,6 +160,7 @@ async function ensureCommunityTable(pool: Pool) {
           p.isFavorite,
           p.style || null,
           "Kho Học Liệu Mẫu",
+          (p as any).grade || null,
         ]
       );
     }
@@ -165,6 +177,40 @@ if (pgPool) {
   });
 }
 
+function communitySeedList(): CommunityPresetItem[] {
+  return PRESET_LESSON_NOTES.map((p) => ({
+    ...(p as any),
+    type: p.type,
+    title: p.title,
+    subject: p.subject,
+    subjectId: p.subjectId,
+    textbook: p.textbook,
+    content: p.content,
+    date: p.date,
+    isFavorite: p.isFavorite,
+    style: p.style || "standard",
+    author: "Kho Học Liệu Mẫu",
+    likes: 0,
+    views: 0,
+    grade: (p as any).grade || undefined,
+    createdAt: new Date().toISOString(),
+    fromCommunity: false,
+  }));
+}
+
+// Đọc file JSON, nếu chưa có thì dùng seed mặc định (để like/view trên bài seed vẫn lưu được).
+function readCommunityListOrSeed(): CommunityPresetItem[] {
+  try {
+    if (fs.existsSync(COMMUNITY_DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8"));
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn("[Community] Không đọc được dữ liệu JSON, dùng seed mặc định:", err);
+  }
+  return communitySeedList();
+}
+
 async function loadAllPresets(): Promise<CommunityPresetItem[]> {
   if (pgPool) {
     const { rows } = await pgPool.query(
@@ -173,30 +219,15 @@ async function loadAllPresets(): Promise<CommunityPresetItem[]> {
     return rows.map(rowToPreset);
   }
   // Fallback: file JSON
-  try {
-    if (fs.existsSync(COMMUNITY_DATA_FILE)) {
-      const raw = fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (err) {
-    console.warn("[Community] Không đọc được dữ liệu JSON, dùng seed mặc định:", err);
-  }
-  return PRESET_LESSON_NOTES.map((p) => ({
-    ...p,
-    author: "Kho Học Liệu Mẫu",
-    likes: 0,
-    createdAt: new Date().toISOString(),
-    fromCommunity: false,
-  }));
+  return readCommunityListOrSeed();
 }
 
 async function insertPreset(item: CommunityPresetItem) {
   if (pgPool) {
     await pgPool.query(
       `INSERT INTO community_presets
-         (id, type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, author, likes, "fromCommunity")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,true)`,
+         (id, type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, author, likes, views, grade, "fromCommunity")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,0,$12,true)`,
       [
         item.id,
         item.type,
@@ -209,20 +240,13 @@ async function insertPreset(item: CommunityPresetItem) {
         item.isFavorite,
         item.style || null,
         item.author,
+        item.grade || null,
       ]
     );
     return;
   }
   // Fallback: file JSON
-  let list: CommunityPresetItem[] = [];
-  try {
-    if (fs.existsSync(COMMUNITY_DATA_FILE)) {
-      list = JSON.parse(fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8"));
-    }
-  } catch {
-    list = [];
-  }
-  if (!Array.isArray(list)) list = [];
+  let list: CommunityPresetItem[] = readCommunityListOrSeed();
   list = [item, ...list];
   fs.mkdirSync(path.dirname(COMMUNITY_DATA_FILE), { recursive: true });
   fs.writeFileSync(COMMUNITY_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
@@ -242,13 +266,36 @@ async function bumpLikes(id: string, liked: boolean): Promise<number | null> {
   }
   // Fallback: file JSON
   try {
-    const raw = fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8");
-    const list = JSON.parse(raw);
+    const list = readCommunityListOrSeed();
     const item = list.find((x: any) => x.id === id);
     if (!item) return null;
     item.likes = Math.max(0, (item.likes || 0) + (liked ? 1 : -1));
     fs.writeFileSync(COMMUNITY_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
     return item.likes;
+  } catch {
+    return null;
+  }
+}
+
+async function bumpViews(id: string): Promise<number | null> {
+  if (pgPool) {
+    const { rows } = await pgPool.query(
+      `UPDATE community_presets
+         SET views = views + 1
+       WHERE id = $1
+       RETURNING views`,
+      [id]
+    );
+    return rows.length ? rows[0].views : null;
+  }
+  // Fallback: file JSON
+  try {
+    const list = readCommunityListOrSeed();
+    const item = list.find((x: any) => x.id === id);
+    if (!item) return null;
+    item.views = (item.views || 0) + 1;
+    fs.writeFileSync(COMMUNITY_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
+    return item.views;
   } catch {
     return null;
   }
@@ -271,6 +318,7 @@ interface PendingPresetItem {
   date: string;
   style?: string;
   author: string;
+  grade?: string;
   source: "auto" | "manual";
   createdAt: string;
 }
@@ -290,10 +338,12 @@ async function ensurePendingTable(pool: Pool) {
       date TEXT,
       style TEXT,
       author TEXT NOT NULL DEFAULT 'Bạn ẩn danh',
+      grade TEXT,
       source TEXT NOT NULL DEFAULT 'manual',
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await pool.query(`ALTER TABLE pending_presets ADD COLUMN IF NOT EXISTS grade TEXT`).catch(() => {});
 }
 
 function rowToPendingPreset(row: any): PendingPresetItem {
@@ -308,6 +358,7 @@ function rowToPendingPreset(row: any): PendingPresetItem {
     date: row.date || new Date(row.createdAt).toLocaleDateString("vi-VN"),
     style: row.style || undefined,
     author: row.author,
+    grade: row.grade || undefined,
     source: row.source === "auto" ? "auto" : "manual",
     createdAt:
       row.createdAt instanceof Date
@@ -380,8 +431,8 @@ async function insertPendingPreset(
     try {
       await pgPool.query(
         `INSERT INTO pending_presets
-           (id, type, title, subject, "subjectId", textbook, content, date, style, author, source)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           (id, type, title, subject, "subjectId", textbook, content, date, style, author, grade, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [
           item.id,
           item.type,
@@ -393,6 +444,7 @@ async function insertPendingPreset(
           item.date,
           item.style || null,
           item.author,
+          item.grade || null,
           item.source,
         ]
       );
@@ -426,6 +478,8 @@ async function approvePendingPreset(id: string): Promise<boolean> {
     style: item.style || "standard",
     author: item.author || "Kho Học Liệu Mẫu",
     likes: 0,
+    views: 0,
+    grade: item.grade,
     createdAt: new Date().toISOString(),
     fromCommunity: true,
   };
@@ -2599,6 +2653,7 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         content,
         style,
         author,
+        grade,
         type = "note",
       } = req.body || {};
 
@@ -2629,6 +2684,7 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
         }),
         style: style || "standard",
         author: String(author || "Bạn ẩn danh").trim().slice(0, 60),
+        grade: String(grade || "").trim().slice(0, 2) || undefined,
         source: "manual",
         createdAt: new Date().toISOString(),
       };
@@ -2670,6 +2726,21 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
     } catch (err: any) {
       console.error("Error liking community preset:", err);
       res.status(500).json({ error: "Không cập nhật được lượt thích." });
+    }
+  });
+
+  // API: Tăng lượt xem khi mở bài mẫu
+  app.post("/api/community/presets/:id/view", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const newViews = await bumpViews(id);
+      if (newViews === null) {
+        return res.status(404).json({ error: "Không tìm thấy bài mẫu." });
+      }
+      res.json({ id, views: newViews });
+    } catch (err: any) {
+      console.error("Error viewing community preset:", err);
+      res.status(500).json({ error: "Không cập nhật được lượt xem." });
     }
   });
 

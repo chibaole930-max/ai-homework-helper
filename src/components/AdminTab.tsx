@@ -83,6 +83,7 @@ interface PendingPresetItem {
   date: string;
   style?: string;
   author: string;
+  grade?: string;
   source: 'auto' | 'manual';
   createdAt: string;
 }
@@ -1421,6 +1422,7 @@ export default function AdminTab() {
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
                       {item.subject}
+                      {item.grade ? ` • Lớp ${item.grade}` : ''}
                       {item.textbook ? ` • ${item.textbook}` : ''}
                       {item.style ? ` • ${item.style}` : ''} • {item.author} • {item.date}
                     </div>
