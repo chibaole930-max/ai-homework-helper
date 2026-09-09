@@ -16,7 +16,7 @@ import { VipModal } from './components/VipModal';
 import { SavedStudyItem, GradeId } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
-import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench, HeartHandshake } from 'lucide-react';
+import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench, HeartHandshake, FolderHeart } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
@@ -239,6 +239,7 @@ function AppContent() {
   }
 
   if (siteStatus?.maintenance.enabled) {
+    const tabBlocked = activeTab !== 'saved';
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
         <Navbar
@@ -249,20 +250,53 @@ function AppContent() {
           onGradeChange={setGrade}
           onlineCount={onlineCount}
         />
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto">
-              <Wrench className="w-8 h-8" />
+        {tabBlocked ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto">
+                <Wrench className="w-8 h-8" />
+              </div>
+              <h1 className="text-xl font-extrabold text-slate-900">
+                Hệ Thống Đang Bảo Trì
+              </h1>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                {siteStatus.maintenance.message ||
+                  'Chúng tôi đang nâng cấp và hoàn thiện. Vui lòng quay lại sau ít phút nữa nhé!'}
+              </p>
+              <button
+                onClick={() => setActiveTab('saved')}
+                className="mt-2 inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 transition-colors"
+              >
+                <FolderHeart className="w-4 h-4" />
+                Xem Vở Ghi của tôi
+              </button>
             </div>
-            <h1 className="text-xl font-extrabold text-slate-900">
-              Hệ Thống Đang Bảo Trì
-            </h1>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              {siteStatus.maintenance.message ||
-                'Chúng tôi đang nâng cấp và hoàn thiện. Vui lòng quay lại sau ít phút nữa nhé!'}
-            </p>
           </div>
-        </div>
+        ) : (
+          <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+            <div className="mb-4 px-4 py-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs bg-amber-50 border-amber-200 text-amber-800">
+              <span className="font-medium flex items-center gap-1.5 leading-relaxed">
+                <Wrench className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                Hệ thống đang bảo trì: các tính năng AI &amp; Kho bài mẫu tạm khoá. Vở Ghi của bạn
+                vẫn hoạt động bình thường.
+              </span>
+              <button
+                onClick={() => setActiveTab('notes')}
+                className="font-bold text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
+              >
+                OK
+              </button>
+            </div>
+            <SavedNotesTab
+              items={savedItems}
+              onToggleFavorite={handleToggleFavorite}
+              onDeleteItem={handleDeleteItem}
+              onClearAll={handleClearAll}
+              subjects={subjects}
+              gradeLabel={gradeLabel}
+            />
+          </main>
+        )}
       </div>
     );
   }
