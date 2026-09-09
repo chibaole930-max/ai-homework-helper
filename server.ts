@@ -474,24 +474,41 @@ async function rejectPendingPreset(id: string): Promise<boolean> {
   return true;
 }
 
-function getSiteGeminiApiKey(): string | null {
-  const fromSettings = cachedSiteSettings?.ai?.geminiKey?.trim();
-  if (fromSettings) return fromSettings;
-  return process.env.GEMINI_API_KEY || null;
+function getSiteGeminiApiKeys(): string[] {
+  const keys: string[] = [];
+  const fromSettings = (cachedSiteSettings?.ai?.geminiKey || "").split(/[\n,;]+/);
+  for (const k of fromSettings) {
+    const trimmed = k.trim();
+    if (trimmed && !keys.includes(trimmed)) keys.push(trimmed);
+  }
+  const envKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (envKey && !keys.includes(envKey)) keys.push(envKey);
+  return keys;
 }
 
-function getGeminiClient(): GoogleGenAI {
-  const apiKey = getSiteGeminiApiKey();
-  if (!apiKey) {
+let geminiRotationIndex = 0;
+
+// Trả về danh sách các Gemini client (mỗi key 1 client), đã xoay vòng vị trí
+// bắt đầu để phân bổ tải đều giữa các key khi có nhiều key.
+function getGeminiClients(): GoogleGenAI[] {
+  const keys = getSiteGeminiApiKeys();
+  if (keys.length === 0) {
     throw new Error("GEMINI_API_KEY is not set in the environment.");
   }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
+  const rotated = [
+    ...keys.slice(geminiRotationIndex),
+    ...keys.slice(0, geminiRotationIndex),
+  ];
+  geminiRotationIndex = (geminiRotationIndex + 1) % keys.length;
+  return rotated.map((apiKey) => {
+    return new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
       },
-    },
+    });
   });
 }
 
@@ -541,7 +558,7 @@ function parseGeminiErrorMessage(err: any): string {
 }
 
 async function generateContentWithFallback(
-  ai: GoogleGenAI,
+  clients: GoogleGenAI[],
   params: {
     contents: any;
     config?: any;
@@ -554,45 +571,57 @@ async function generateContentWithFallback(
 
   let lastError: any = null;
 
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
-    const maxAttempts = 2;
+  // Lần lượt thử từng key (rotate từ đầu), với mỗi key sẽ chạy chuỗi dự phòng model.
+  for (let k = 0; k < clients.length; k++) {
+    const ai = clients[k];
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        console.log(`[Gemini] Requesting model ${model} (attempt ${attempt}/${maxAttempts})...`);
-        const response = await ai.models.generateContent({
-          model,
-          contents: params.contents,
-          config: params.config,
-        });
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
+      const maxAttempts = 2;
 
-        if (response && response.text) {
-          console.log(`[Gemini] Successfully generated response with model: ${model}`);
-          return response;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          console.log(
+            `[Gemini] key#${k + 1}/${clients.length} model ${model} (attempt ${attempt}/${maxAttempts})...`
+          );
+          const response = await ai.models.generateContent({
+            model,
+            contents: params.contents,
+            config: params.config,
+          });
+
+          if (response && response.text) {
+            console.log(
+              `[Gemini] Success with key#${k + 1}/${clients.length} model: ${model}`
+            );
+            return response;
+          }
+        } catch (err: any) {
+          lastError = err;
+          const errMsg = err?.message || String(err);
+          console.warn(
+            `[Gemini] key#${k + 1}/${clients.length} model ${model} failed on attempt ${attempt}:`,
+            errMsg
+          );
+
+          const isTemporary =
+            errMsg.includes("503") ||
+            errMsg.includes("UNAVAILABLE") ||
+            errMsg.includes("high demand") ||
+            errMsg.includes("429") ||
+            errMsg.includes("RESOURCE_EXHAUSTED") ||
+            errMsg.includes("fetch failed");
+
+          if (isTemporary && attempt < maxAttempts) {
+            // Exponential delay before retry
+            const delayMs = attempt * 1200;
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            continue;
+          }
+
+          // If this model is unavailable, break inner loop to try next model in fallback chain
+          break;
         }
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = err?.message || String(err);
-        console.warn(`[Gemini] Model ${model} failed on attempt ${attempt}:`, errMsg);
-
-        const isTemporary =
-          errMsg.includes("503") ||
-          errMsg.includes("UNAVAILABLE") ||
-          errMsg.includes("high demand") ||
-          errMsg.includes("429") ||
-          errMsg.includes("RESOURCE_EXHAUSTED") ||
-          errMsg.includes("fetch failed");
-
-        if (isTemporary && attempt < maxAttempts) {
-          // Exponential delay before retry
-          const delayMs = attempt * 1200;
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          continue;
-        }
-
-        // If this model is unavailable, break inner loop to try next model in fallback chain
-        break;
       }
     }
   }
@@ -1905,7 +1934,7 @@ async function startServer() {
       // Giới hạn lượt AI miễn phí (VIP không giới hạn)
       if (!(await checkAiUsageLimit(req, res))) return;
 
-      const ai = getGeminiClient();
+      const aiClients = getGeminiClients();
 
       const systemInstruction = `Bạn là chuyên gia sư phạm THPT hàng đầu Việt Nam, bám sát hệ thống học liệu và phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com) dành cho học sinh ${gradeLabel} theo Chương trình Giáo dục Phổ thông mới (GDPT 2018 - bộ sách Kết nối tri thức với cuộc sống, Cánh diều, Chân trời sáng tạo) và định hướng thi Tốt nghiệp THPT & Đánh giá năng lực.
 Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
@@ -1996,7 +2025,7 @@ ${promptGoal}
 
 Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com), trình bày bằng Markdown rõ ràng, đẹp mắt, chia các đề mục rành mạch, dùng ký hiệu khoa học / công thức toán học chuẩn xác, dễ đọc trên cả điện thoại và máy tính.`;
 
-      const response = await generateContentWithFallback(ai, {
+      const response = await generateContentWithFallback(aiClients, {
         contents: prompt,
         config: {
           systemInstruction,
@@ -2074,7 +2103,7 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
       // Giới hạn lượt AI miễn phí (VIP không giới hạn)
       if (!(await checkAiUsageLimit(req, res))) return;
 
-      const ai = getGeminiClient();
+      const aiClients = getGeminiClients();
 
       const systemInstruction = `Bạn là chuyên gia giải bài tập và gia sư hàng đầu theo chuẩn học liệu Lời Giải Hay (loigiaihay.com) cho học sinh ${gradeLabel} tại Việt Nam.
 Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT) phải tuân thủ chuẩn mực sư phạm của Lời Giải Hay:
@@ -2148,7 +2177,7 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
           ? contentsList[0].text
           : { parts: contentsList };
 
-      const response = await generateContentWithFallback(ai, {
+      const response = await generateContentWithFallback(aiClients, {
         contents: payloadContents,
         config: {
           systemInstruction,
@@ -2183,7 +2212,7 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
       // Giới hạn lượt AI miễn phí (VIP không giới hạn)
       if (!(await checkAiUsageLimit(req, res))) return;
 
-      const ai = getGeminiClient();
+      const aiClients = getGeminiClients();
 
       const systemInstruction = `Bạn là gia sư hỗ trợ học tập ${gradeLabel}. Học sinh đang xem lời giải của một bài tập và có thắc mắc thêm. Hãy trả lời thật dễ hiểu, kiên nhẫn, phân tích đúng trọng tâm câu hỏi của học sinh, đưa ra ví dụ trực quan nếu cần.`;
 
@@ -2198,7 +2227,7 @@ CÂU HỎI THẮC MẮC CỦA HỌC SINH:
 
 Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học sinh hiểu sâu bản chất vấn đề.`;
 
-      const response = await generateContentWithFallback(ai, {
+      const response = await generateContentWithFallback(aiClients, {
         contents: prompt,
         config: {
           systemInstruction,

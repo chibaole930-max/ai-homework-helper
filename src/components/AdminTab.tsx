@@ -812,7 +812,7 @@ export default function AdminTab() {
                     : prev
                 )
               }
-              placeholder="AIza..."
+              placeholder="AIza... (mỗi key 1 dòng / cách nhau dấu phẩy)"
               autoComplete="off"
               className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pr-11 text-sm font-mono focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
             />
@@ -829,6 +829,12 @@ export default function AdminTab() {
         <div className="px-3 py-2 rounded-xl bg-indigo-50/50 text-[11px] text-slate-500 flex items-start gap-1.5">
           <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0 text-indigo-500" />
           <div className="space-y-1">
+            <p>
+              <b className="text-indigo-600">Hỗ trợ nhiều key cùng lúc</b>: mỗi key trên một dòng
+              (hoặc cách nhau dấu phẩy <code className="font-mono">,</code>/chấm phẩy{' '}
+              <code className="font-mono">;</code>). Server tự xoay vòng chia tải, gặp key hết quota
+              sẽ tự thử key tiếp theo.
+            </p>
             <p>
               Để thay đổi key: nhập key mới rồi bấm <b className="text-indigo-600">Lưu cài đặt</b>{' '}
               ở cuối trang. Key lưu ngay lập tức áp dụng.
