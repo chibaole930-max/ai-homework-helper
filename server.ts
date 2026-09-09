@@ -503,6 +503,72 @@ function maskGeminiKey(key: string): string {
   return key.slice(0, 4) + "****" + key.slice(-4);
 }
 
+// ---------------------------------------------------------------------------
+// NGÂN SÁCH/ĐẾM LƯỢT THEO NGÀY CHO TỪNG KEY (persist qua file)
+// ---------------------------------------------------------------------------
+const DEFAULT_AI_KEY_DAILY_LIMIT = 20;
+
+function budgetFor(limit?: number): number {
+  const n = Math.floor(Number(limit) || 0);
+  return n > 0 ? Math.min(n, 100000) : DEFAULT_AI_KEY_DAILY_LIMIT;
+}
+
+const AI_USAGE_FILE = path.join(process.cwd(), "data", "ai-usage.json");
+
+function readAiUsageFile(): { date: string; counts: Record<string, number> } {
+  try {
+    if (fs.existsSync(AI_USAGE_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(AI_USAGE_FILE, "utf-8"));
+      return {
+        date: String(parsed?.date || ""),
+        counts: parsed?.counts && typeof parsed.counts === "object" ? parsed.counts : {},
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { date: "", counts: {} };
+}
+
+let aiUsageCache: { date: string; counts: Record<string, number> } = { date: "", counts: {} };
+
+function getAiUsageSnapshot(): { date: string; counts: Record<string, number> } {
+  if (aiUsageCache.date !== statDay()) {
+    const stored = readAiUsageFile();
+    aiUsageCache = stored.date === statDay() ? stored : { date: statDay(), counts: {} };
+  }
+  return aiUsageCache;
+}
+
+function bumpAiUsage(key: string) {
+  const snap = getAiUsageSnapshot();
+  snap.counts[key] = (snap.counts[key] || 0) + 1;
+  try {
+    fs.mkdirSync(path.dirname(AI_USAGE_FILE), { recursive: true });
+    fs.writeFileSync(AI_USAGE_FILE, JSON.stringify(snap), "utf-8");
+  } catch (err) {
+    console.warn("[AI] Không lưu được usage:", err);
+  }
+}
+
+// Trả về danh sách key đang hoạt động kèm ngân sách (limit) + tên cho trang admin.
+function getAiKeyBudgetInfos(): { key: string; name?: string; limit: number }[] {
+  const infos: { key: string; name?: string; limit: number }[] = [];
+  const seen = new Set<string>();
+  for (const k of cachedSiteSettings?.ai?.keys || []) {
+    if (!k || !k.enabled) continue;
+    const key = (k.key || "").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    infos.push({ key, name: k.name, limit: budgetFor(k.limit) });
+  }
+  const envKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (envKey && !seen.has(envKey)) {
+    infos.push({ key: envKey, name: "Môi trường (GEMINI_API_KEY)", limit: DEFAULT_AI_KEY_DAILY_LIMIT });
+  }
+  return infos;
+}
+
 function getGeminiKeyStatsFor(key: string) {
   let s = geminiKeyStats.get(key);
   if (!s) {
@@ -614,6 +680,7 @@ async function generateContentWithFallback(
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         stat.requests += 1;
         stat.lastUsedAt = Date.now();
+        bumpAiUsage(key);
         try {
           console.log(
             `[Gemini] key#${k + 1}/${entries.length} ${maskGeminiKey(key)} model ${model} (attempt ${attempt}/${maxAttempts})...`
@@ -1303,6 +1370,7 @@ interface AiKeyConfig {
   name?: string;
   key: string;
   enabled: boolean;
+  limit?: number;
 }
 
 interface SiteSettings {
@@ -1339,21 +1407,24 @@ function normalizeAiConfig(ai: any): { geminiKey: string; keys: AiKeyConfig[] } 
     id: string | undefined,
     name: string | undefined,
     key: string,
-    enabled: boolean
+    enabled: boolean,
+    limit?: number
   ) => {
     const trimmed = String(key || "").trim().slice(0, 300);
     if (!trimmed || seen.has(trimmed)) return;
     seen.add(trimmed);
+    const n = Math.floor(Number(limit) || 0);
     keys.push({
       id: String(id || genKeyId()).slice(0, 40),
       name: (name || "").trim().slice(0, 60) || undefined,
       key: trimmed,
       enabled: !!enabled,
+      limit: n > 0 ? Math.min(n, 100000) : undefined,
     });
   };
   if (ai && Array.isArray(ai.keys)) {
     for (const k of ai.keys) {
-      if (k && typeof k === "object") pushKey(k.id, k.name, k.key, k.enabled);
+      if (k && typeof k === "object") pushKey(k.id, k.name, k.key, k.enabled, k.limit);
     }
   }
   for (const part of parseGeminiKeyList(ai?.geminiKey)) pushKey(undefined, undefined, part, true);
@@ -1643,6 +1714,10 @@ async function startServer() {
           name: String(k.name || "").trim().slice(0, 60) || undefined,
           key,
           enabled: !!k.enabled,
+          limit:
+            Math.floor(Number(k.limit) || 0) > 0
+              ? Math.min(Math.floor(Number(k.limit)), 100000)
+              : undefined,
         });
       }
 
@@ -1700,6 +1775,84 @@ async function startServer() {
     } catch (err: any) {
       console.error("Error reading AI key stats:", err);
       res.status(500).json({ error: "Không đọc được thống kê." });
+    }
+  });
+
+  // API: Sức khỏe + dự tính cấu hình tiết kiệm nhất cho các API key AI (admin)
+  app.get("/api/admin/ai-health", requireAdmin, async (_req, res) => {
+    try {
+      const infos = getAiKeyBudgetInfos();
+      const usageSnap = getAiUsageSnapshot();
+      const now = Date.now();
+
+      const nextReset = new Date();
+      nextReset.setUTCHours(24, 0, 0, 0); // reset theo ngày UTC (00:00)
+      const resetInMs = Math.max(0, nextReset.getTime() - now);
+
+      const keys = infos.map((info) => {
+        const s = geminiKeyStats.get(info.key);
+        const usedToday = usageSnap.counts[info.key] || 0;
+        return {
+          key: maskGeminiKey(info.key),
+          name: info.name || undefined,
+          limit: info.limit,
+          usedToday,
+          remaining: Math.max(0, info.limit - usedToday),
+          requests: s?.requests || 0,
+          successes: s?.successes || 0,
+          failures: s?.failures || 0,
+        };
+      });
+
+      // Nhu cầu AI thực tế (soạn + giải + hỏi đáp) 7 ngày gần nhất
+      const overview = await loadStatsOverview();
+      const aiEvents = ["lesson_note", "solve_exercise", "tutor_followup"];
+      const aiSum = (evs: Record<string, number>) =>
+        aiEvents.reduce((sum, ev) => sum + (evs[ev] || 0), 0);
+      const daySums = overview.daily.slice(-7).map((d) => aiSum(d.events));
+      const nonEmpty = daySums.filter((n) => n > 0);
+      const avg7 = nonEmpty.length
+        ? Math.round(nonEmpty.reduce((a, b) => a + b, 0) / nonEmpty.length)
+        : 0;
+      const todayDemand = aiSum(overview.todayEvents);
+
+      const totalBudget = infos.reduce((a, i) => a + i.limit, 0);
+      const totalUsedToday = keys.reduce((a, k) => a + k.usedToday, 0);
+      const totalRemaining = keys.reduce((a, k) => a + k.remaining, 0);
+      const activeCount = infos.length;
+      const limitAvg = activeCount
+        ? Math.max(1, Math.round(totalBudget / activeCount))
+        : DEFAULT_AI_KEY_DAILY_LIMIT;
+
+      const demand = Math.max(avg7, todayDemand);
+      const neededKeys = limitAvg > 0 ? Math.max(1, Math.ceil((demand * 1.5) / limitAvg)) : 1;
+      const extraKeys = Math.max(0, neededKeys - activeCount);
+      const status =
+        (activeCount > 0 && totalRemaining === 0) || (demand > 0 && activeCount === 0)
+          ? "exhausted"
+          : extraKeys > 0
+            ? "tight"
+            : "ok";
+
+      res.json({
+        keys,
+        summary: {
+          totalBudget,
+          totalUsedToday,
+          totalRemaining,
+          avg7,
+          todayDemand,
+          activeCount,
+          neededKeys,
+          extraKeys,
+          limitAvg,
+          resetInMs,
+          status,
+        },
+      });
+    } catch (err: any) {
+      console.error("Error reading AI health:", err);
+      res.status(500).json({ error: "Không đọc được sức khỏe key." });
     }
   });
 

@@ -30,6 +30,7 @@ import {
   EyeOff,
   Plus,
   RefreshCw,
+  HeartPulse,
 } from 'lucide-react';
 
 interface AiKeyConfig {
@@ -37,6 +38,7 @@ interface AiKeyConfig {
   name?: string;
   key: string;
   enabled: boolean;
+  limit?: number;
 }
 
 interface SiteSettings {
@@ -127,21 +129,49 @@ export default function AdminTab() {
     activeKeys: string[];
   } | null>(null);
   const [aiStatsLoading, setAiStatsLoading] = useState(false);
+  const [aiHealth, setAiHealth] = useState<{
+    keys: {
+      key: string;
+      name?: string;
+      limit: number;
+      usedToday: number;
+      remaining: number;
+      requests: number;
+      successes: number;
+      failures: number;
+    }[];
+    summary: {
+      totalBudget: number;
+      totalUsedToday: number;
+      totalRemaining: number;
+      avg7: number;
+      todayDemand: number;
+      activeCount: number;
+      neededKeys: number;
+      extraKeys: number;
+      limitAvg: number;
+      resetInMs: number;
+      status: 'ok' | 'tight' | 'exhausted';
+    };
+  } | null>(null);
 
   const loadAiStats = async () => {
     if (!token) return;
     setAiStatsLoading(true);
     try {
-      const res = await fetch('/api/admin/ai-stats', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
+      const [statsRes, healthRes] = await Promise.all([
+        fetch('/api/admin/ai-stats', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/ai-health', { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (statsRes.status === 401 || healthRes.status === 401) {
         sessionStorage.removeItem(TOKEN_KEY);
         setToken('');
         return;
       }
-      if (!res.ok) throw new Error('Không đọc được thống kê AI.');
-      setAiStats(await res.json());
+      if (!statsRes.ok) throw new Error('Không đọc được thống kê AI.');
+      if (!healthRes.ok) throw new Error('Không đọc được sức khỏe key AI.');
+      setAiStats(await statsRes.json());
+      setAiHealth(await healthRes.json());
     } catch (err: any) {
       setSaveMsg({ ok: false, text: err.message || 'Không đọc được thống kê AI.' });
     } finally {
@@ -919,6 +949,19 @@ export default function AdminTab() {
                     placeholder="Tên (VD: Key chính, Key dự phòng...)"
                     className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
                   />
+                  <input
+                    type="number"
+                    min={1}
+                    value={k.limit || ''}
+                    onChange={(e) =>
+                      patchAiKey(k.id, {
+                        limit: e.target.value === '' ? undefined : Math.max(1, Number(e.target.value)),
+                      })
+                    }
+                    placeholder="20"
+                    title={`Giới hạn lượt/ngày (bỏ trống = 20)`}
+                    className="w-16 shrink-0 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-center focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
+                  />
                   <label className="flex items-center gap-1.5 cursor-pointer shrink-0 text-[11px] font-bold text-slate-600">
                     <input
                       type="checkbox"
@@ -1026,6 +1069,119 @@ export default function AdminTab() {
             </div>
           )}
         </div>
+
+        {aiHealth && (
+          <div className="pt-1 border-t border-slate-100 space-y-2">
+            <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+              <HeartPulse className="w-3.5 h-3.5 text-emerald-500" />
+              Sức khỏe key & dự tính tiết kiệm
+              <span className="font-normal text-slate-400">
+                (reset sau ≈{' '}
+                {(() => {
+                  const ms = aiHealth.summary.resetInMs;
+                  const h = Math.floor(ms / 3600000);
+                  const m = Math.ceil((ms % 3600000) / 60000);
+                  return h > 0 ? `${h} giờ ${m} phút` : `${m} phút`;
+                })()}
+                )
+              </span>
+            </div>
+
+            {aiHealth.keys.length === 0 ? (
+              <div className="text-[11px] text-slate-400 px-2 py-1">
+                Không có key nào đang hoạt động (chỉ mới có key môi trường nếu được đặt).
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {aiHealth.keys.map((k) => {
+                  const pct =
+                    k.limit > 0 ? Math.min(100, Math.round((k.usedToday / k.limit) * 100)) : 0;
+                  const barColor =
+                    k.remaining === 0
+                      ? 'bg-rose-500'
+                      : pct >= 70
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500';
+                  const txtColor =
+                    k.remaining === 0
+                      ? 'text-rose-500'
+                      : pct >= 70
+                        ? 'text-amber-600'
+                        : 'text-emerald-600';
+                  return (
+                    <div key={k.key} className="rounded-lg border border-slate-200 px-3 py-2 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 truncate">
+                          <span className="font-mono">{k.key}</span>
+                          {k.name && <span className="text-slate-400 font-normal truncate">· {k.name}</span>}
+                        </span>
+                        <span className={`text-[10px] font-bold shrink-0 ${txtColor}`}>
+                          {k.usedToday}/{k.limit} lượt · còn {k.remaining}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${barColor}`}
+                          style={{ width: `${Math.max(2, pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2 text-[10px] text-slate-600 space-y-0.5">
+                <div className="font-bold text-emerald-700 text-[11px] mb-1">Nhu cầu AI thực tế</div>
+                <div>
+                  TB 7 ngày: <b className="text-slate-700">{aiHealth.summary.avg7}</b> lượt/ngày
+                </div>
+                <div>
+                  Hôm nay: <b className="text-slate-700">{aiHealth.summary.todayDemand}</b> lượt
+                </div>
+                <div>
+                  Tổng tiêu hôm nay:{' '}
+                  <b className="text-slate-700">
+                    {aiHealth.summary.totalUsedToday}/{aiHealth.summary.totalBudget}
+                  </b>{' '}
+                  lượt
+                </div>
+              </div>
+              <div
+                className={`rounded-lg border px-3 py-2 text-[10px] leading-relaxed ${
+                  aiHealth.summary.status === 'ok'
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                    : aiHealth.summary.status === 'tight'
+                      ? 'bg-amber-50 border-amber-200 text-amber-800'
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}
+              >
+                <div className="font-bold text-[11px] mb-1">Cấu hình tiết kiệm nhất</div>
+                {aiHealth.summary.status === 'ok' && (
+                  <span>
+                    Đang có <b>{aiHealth.summary.activeCount}</b> key, vừa đủ cho nhu cầu (~{' '}
+                    <b>{aiHealth.summary.neededKeys}</b> key). Không cần thêm key.
+                  </span>
+                )}
+                {aiHealth.summary.status === 'tight' && (
+                  <span>
+                    Nên có ~<b>{aiHealth.summary.neededKeys}</b> key (đang có{' '}
+                    <b>{aiHealth.summary.activeCount}</b>). Bổ sung ≈
+                    <b>{aiHealth.summary.extraKeys}</b> key nữa để tránh gián đoạn. Khi để trống
+                    giới hạn, mỗi key mặc định <b>20 lượt/ngày</b>.
+                  </span>
+                )}
+                {aiHealth.summary.status === 'exhausted' && (
+                  <span>
+                    Không đủ key cho nhu cầu. Hãy thêm key hoặc nâng giới hạn/ngày từng key, rồi bấm{' '}
+                    <b>Lưu cài đặt</b>.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="px-3 py-2 rounded-xl bg-indigo-50/50 text-[11px] text-slate-500 flex items-start gap-1.5">
           <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0 text-indigo-500" />
