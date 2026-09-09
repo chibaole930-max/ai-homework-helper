@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { X, Crown, Ticket, CheckCircle2, Loader2, LogIn } from 'lucide-react';
+import {
+  X,
+  Crown,
+  Ticket,
+  CheckCircle2,
+  Loader2,
+  LogIn,
+  Smartphone,
+  Send,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { authHeaders } from '../lib/auth';
 
 const PLANS = [
   {
@@ -35,6 +45,13 @@ export const VipModal: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [selectedPlan, setSelectedPlan] = useState('1m');
+  const [phone, setPhone] = useState('');
+  const [orderNote, setOrderNote] = useState('');
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [orderMsg, setOrderMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [showOrderForm, setShowOrderForm] = useState(false);
+
   if (!vipOpen) return null;
 
   const handleRedeem = async (e: React.FormEvent) => {
@@ -53,6 +70,47 @@ export const VipModal: React.FC = () => {
     } else {
       setSuccess('Kích hoạt thành công! Chúc bạn học tập vui vẻ.');
       setCode('');
+    }
+  };
+
+  const choosePlan = (id: string) => {
+    setSelectedPlan(id);
+    setOrderMsg(null);
+    setShowOrderForm(true);
+  };
+
+  const handleOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOrderMsg(null);
+    if (!user) {
+      openAuth();
+      return;
+    }
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 9 || cleanPhone.length > 13) {
+      setOrderMsg({ ok: false, text: 'Vui lòng nhập đúng SĐT Zalo của bạn.' });
+      return;
+    }
+    setOrderBusy(true);
+    try {
+      const res = await fetch('/api/vip/orders', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ plan: selectedPlan, phone: phone.trim(), note: orderNote.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setOrderMsg({ ok: false, text: data.error || 'Không gửi được yêu cầu đặt mua.' });
+        return;
+      }
+      setOrderMsg({ ok: true, text: data.message || 'Đã gửi yêu cầu đặt mua!' });
+      setShowOrderForm(false);
+      setPhone('');
+      setOrderNote('');
+    } catch {
+      setOrderMsg({ ok: false, text: 'Không kết nối được máy chủ. Vui lòng thử lại.' });
+    } finally {
+      setOrderBusy(false);
     }
   };
 
@@ -88,7 +146,7 @@ export const VipModal: React.FC = () => {
           ) : !user ? (
             <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-center">
               <p className="text-sm font-bold text-amber-800 mb-2">
-                Bạn cần đăng nhập để nhập mã kích hoạt VIP
+                Bạn cần đăng nhập để đặt mua hoặc nhập mã VIP
               </p>
               <button
                 onClick={openAuth}
@@ -119,76 +177,152 @@ export const VipModal: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleRedeem} className="space-y-2">
-            <label className="text-xs font-bold text-slate-600 block">
-              Nhập mã kích hoạt VIP
-            </label>
-            <div className="flex gap-2">
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="VD: VIP1-XXXX-XXXX-XXXX"
-                disabled={!user}
-                className="flex-1 rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm tracking-wider font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:bg-slate-100 disabled:text-slate-400"
-              />
-              <button
-                type="submit"
-                disabled={busy || !user}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-bold px-4 text-sm shadow-md hover:opacity-90 transition-opacity disabled:opacity-60"
-              >
-                {busy ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Ticket className="w-4 h-4" />
-                )}
-                Kích hoạt
-              </button>
-            </div>
-            {error && (
-              <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" />
-                {success}
-              </div>
-            )}
-          </form>
-
+          {/* Đặt mua gói */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-extrabold text-slate-800">Chọn gói VIP</h3>
+              <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                <Crown className="w-4 h-4 text-amber-500" />
+                Chọn gói & đặt mua
+              </h3>
               <span className="text-[11px] text-slate-400">Giá từ {PLANS[0].price}</span>
             </div>
             <div className="grid grid-cols-3 gap-2.5">
-              {PLANS.map((p) => (
-                <div
-                  key={p.id}
-                  className={`relative rounded-2xl border p-3 text-center ${
-                    p.highlight
-                      ? 'border-amber-400 bg-amber-50 shadow-sm'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  {p.tag && (
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold bg-amber-600 text-white rounded-full px-2 py-0.5 whitespace-nowrap">
-                      {p.tag}
-                    </span>
-                  )}
-                  <p className="text-xs font-bold text-slate-700">{p.name}</p>
-                  <p className="text-base font-extrabold text-amber-600 mt-0.5">
-                    {p.price}
-                  </p>
-                  <p className="text-[11px] text-slate-400">{p.per}</p>
-                </div>
-              ))}
+              {PLANS.map((p) => {
+                const isSel = selectedPlan === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => choosePlan(p.id)}
+                    disabled={!user || busy}
+                    className={`relative rounded-2xl border p-3 text-center transition-all disabled:opacity-50 ${
+                      isSel
+                        ? 'border-amber-500 bg-amber-50 shadow-md ring-2 ring-amber-400/30'
+                        : 'border-slate-200 bg-white hover:border-amber-300'
+                    } ${p.highlight ? '' : ''}`}
+                  >
+                    {p.tag && (
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold bg-amber-600 text-white rounded-full px-2 py-0.5 whitespace-nowrap">
+                        {p.tag}
+                      </span>
+                    )}
+                    {isSel && (
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center">
+                        <CheckCircle2 className="w-3 h-3" />
+                      </span>
+                    )}
+                    <p className="text-xs font-bold text-slate-700">{p.name}</p>
+                    <p className="text-base font-extrabold text-amber-600 mt-0.5">
+                      {p.price}
+                    </p>
+                    <p className="text-[11px] text-slate-400">{p.per}</p>
+                  </button>
+                );
+              })}
             </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-slate-400 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
-              Hướng dẫn: chọn gói, chuyển khoản/Momo theo số liên hệ bên dưới, rồi chủ web gửi
-              mã kích hoạt cho bạn. Nhập mã để mở khóa ngay.
-            </p>
+
+            {orderMsg && !showOrderForm && (
+              <div
+                className={`mt-3 px-3 py-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                  orderMsg.ok
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                    : 'bg-red-50 border border-red-200 text-red-700'
+                }`}
+              >
+                {orderMsg.ok ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                {orderMsg.text}
+              </div>
+            )}
+
+            {user && showOrderForm && (
+              <form onSubmit={handleOrder} className="mt-3 space-y-2.5 rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
+                <div className="text-xs font-extrabold text-amber-800 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Đặt mua gói {PLANS.find((p) => p.id === selectedPlan)?.name} —{' '}
+                  {PLANS.find((p) => p.id === selectedPlan)?.price}
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    SĐT Zalo của bạn (admin sẽ liên hệ để chốt đơn)
+                  </label>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9+ ]/g, ''))}
+                    placeholder="VD: 0912345678"
+                    inputMode="tel"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    Ghi chú (không bắt buộc)
+                  </label>
+                  <input
+                    value={orderNote}
+                    onChange={(e) => setOrderNote(e.target.value)}
+                    placeholder="VD: cần gấp, học thêm buổi tối..."
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={orderBusy}
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-bold px-4 py-2.5 text-sm shadow-md hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {orderBusy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Gửi yêu cầu đặt mua
+                </button>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Admin sẽ nhận được yêu cầu cùng SĐT Zalo của bạn, liên hệ để chốt đơn và gửi mã
+                  kích hoạt.
+                </p>
+              </form>
+            )}
+          </div>
+
+          {/* Đã có mã */}
+          <div className="border-t border-slate-100 pt-4">
+            <form onSubmit={handleRedeem} className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 block">
+                Đã có mã, nhập để kích hoạt
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="VD: VIP1-XXXX-XXXX-XXXX"
+                  disabled={!user}
+                  className="flex-1 rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm tracking-wider font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:bg-slate-100 disabled:text-slate-400"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !user}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-bold px-4 text-sm shadow-md hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {busy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Ticket className="w-4 h-4" />
+                  )}
+                  Kích hoạt
+                </button>
+              </div>
+              {error && (
+                <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {success}
+                </div>
+              )}
+            </form>
           </div>
         </div>
       </div>

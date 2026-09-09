@@ -23,6 +23,10 @@ import {
   KeyRound,
   Copy,
   ShieldBan,
+  ShoppingCart,
+  Phone,
+  Mail,
+  BadgeCheck,
 } from 'lucide-react';
 
 interface SiteSettings {
@@ -100,6 +104,50 @@ export default function AdminTab() {
   const [genBusy, setGenBusy] = useState(false);
   const [genMsg, setGenMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [vipFilter, setVipFilter] = useState<'all' | 'unused' | 'used' | 'void'>('all');
+
+  const [orders, setOrders] = useState<
+    { id: string; plan: string; phone: string; email: string; note: string; status: string; createdAt: string }[] | null
+  >(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersMsg, setOrdersMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadOrders = async () => {
+    if (!token) return;
+    setOrdersLoading(true);
+    try {
+      const res = await fetch('/api/vip/orders', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        setToken('');
+        return;
+      }
+      if (!res.ok) throw new Error('Không tải được đơn hàng.');
+      const d = await res.json();
+      setOrders(d.orders || []);
+    } catch (err: any) {
+      setOrdersMsg({ ok: false, text: err.message || 'Không tải được đơn hàng.' });
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const toggleOrder = async (id: string) => {
+    setOrdersMsg(null);
+    try {
+      const res = await fetch(`/api/vip/orders/${encodeURIComponent(id)}/toggle`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Không cập nhật được.');
+      setOrders(d.orders || []);
+      setOrdersMsg({ ok: true, text: d.message || 'Đã cập nhật.' });
+    } catch (err: any) {
+      setOrdersMsg({ ok: false, text: err.message || 'Không cập nhật được.' });
+    }
+  };
 
   const fetchVipKeys = async () => {
     if (!token) return;
@@ -219,11 +267,16 @@ export default function AdminTab() {
       .catch(() => {})
       .finally(() => setStatsLoading(false));
     fetchVipKeys();
+    loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const refreshVipKeys = () => {
     fetchVipKeys();
+  };
+
+  const refreshOrders = () => {
+    loadOrders();
   };
 
   const refreshStats = () => {
@@ -950,6 +1003,129 @@ export default function AdminTab() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Đơn hàng đặt mua VIP */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-rose-100 text-rose-600">
+              <ShoppingCart className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                Đơn Hàng Đặt Mua VIP
+                {orders && orders.filter((o) => o.status === 'new').length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold">
+                    {orders.filter((o) => o.status === 'new').length} đơn mới
+                  </span>
+                )}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Học sinh chọn gói + ghi SĐT Zalo. Liên hệ để chốt đơn, phát mã, rồi đánh dấu đã xử lý.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={refreshOrders}
+            disabled={ordersLoading}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50 shrink-0"
+          >
+            {ordersLoading ? 'Đang tải...' : 'Làm mới'}
+          </button>
+        </div>
+
+        {ordersMsg && (
+          <div
+            className={`px-3 py-2 rounded-xl text-xs flex items-center gap-2 ${
+              ordersMsg.ok
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}
+          >
+            {ordersMsg.ok ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+            {ordersMsg.text}
+          </div>
+        )}
+
+        {ordersLoading && !orders ? (
+          <div className="py-6 flex justify-center text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        ) : !orders || orders.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400">
+            Chưa có đơn hàng nào. Học sinh đặt mua sẽ hiện tại đây.
+          </div>
+        ) : (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-[11px]">
+              <thead className="sticky top-0 bg-white">
+                <tr className="text-slate-400 border-b border-slate-200">
+                  <th className="text-left py-1.5 font-bold">Thời gian</th>
+                  <th className="text-left py-1.5 font-bold">Gói</th>
+                  <th className="text-left py-1.5 font-bold">SĐT Zalo</th>
+                  <th className="text-left py-1.5 font-bold">Tài khoản</th>
+                  <th className="text-left py-1.5 font-bold">Ghi chú</th>
+                  <th className="text-left py-1.5 font-bold">Trạng thái</th>
+                  <th className="text-right py-1.5 font-bold">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o) => (
+                  <tr key={o.id} className={`border-b border-slate-100 ${o.status === 'new' ? 'bg-rose-50/50' : ''}`}>
+                    <td className="py-2 pr-2 text-slate-500 whitespace-nowrap">
+                      {new Date(o.createdAt).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="py-2 pr-2 whitespace-nowrap">
+                      <span className="text-amber-700 font-bold">
+                        {o.plan === '1m' ? '1 Tháng' : o.plan === '3m' ? '3 Tháng' : '1 Năm'}
+                      </span>
+                      <span className="text-slate-400">
+                        {' '}
+                        {o.plan === '1m' ? '49.000đ' : o.plan === '3m' ? '119.000đ' : '399.000đ'}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-2">
+                      <span className="inline-flex items-center gap-1 font-bold text-rose-700 whitespace-nowrap">
+                        <Phone className="w-3 h-3" />
+                        {o.phone}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-2 text-slate-600 max-w-[160px] truncate">
+                      <span className="inline-flex items-center gap-1">
+                        <Mail className="w-3 h-3 shrink-0" />
+                        {o.email}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-2 text-slate-500 max-w-[140px] truncate">{o.note || '—'}</td>
+                    <td className="py-2 pr-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
+                          o.status === 'new'
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        {o.status === 'new' ? 'Chưa xử lý' : 'Đã xử lý'}
+                      </span>
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => toggleOrder(o.id)}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          <BadgeCheck className="w-3 h-3" />
+                          {o.status === 'new' ? 'Đã xử lý' : 'Mở lại'}
+                        </span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

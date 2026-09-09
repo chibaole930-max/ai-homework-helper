@@ -725,6 +725,17 @@ async function ensureUsageTable(pool: Pool) {
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vip_orders (
+      id TEXT PRIMARY KEY,
+      plan TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT NOT NULL,
+      "note" TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'new',
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
 }
 
 // ---------------------------------------------------------------------------
@@ -738,6 +749,7 @@ async function ensureUsageTable(pool: Pool) {
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
 const LICENSE_KEYS_FILE = path.join(process.cwd(), "data", "license-keys.json");
+const VIP_ORDERS_FILE = path.join(process.cwd(), "data", "vip-orders.json");
 
 const PLAN_DURATIONS: Record<string, number> = {
   "1m": 30,
@@ -767,6 +779,16 @@ interface LicenseKeyRecord {
   note: string;
   usedByEmail: string | null;
   usedAt: string | null;
+  createdAt: string;
+}
+
+interface VipOrderRecord {
+  id: string;
+  plan: keyof typeof PLAN_DURATIONS;
+  phone: string;
+  email: string;
+  note: string;
+  status: "new" | "handled";
   createdAt: string;
 }
 
@@ -923,6 +945,53 @@ async function writeLicenseKeys(list: LicenseKeyRecord[]) {
   }
   fs.mkdirSync(path.dirname(LICENSE_KEYS_FILE), { recursive: true });
   fs.writeFileSync(LICENSE_KEYS_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+async function readVipOrders(): Promise<VipOrderRecord[]> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query('SELECT * FROM vip_orders ORDER BY "createdAt" DESC');
+      return rows.map((r) => ({
+        id: String(r.id),
+        plan: String(r.plan) as VipOrderRecord["plan"],
+        phone: String(r.phone),
+        email: String(r.email),
+        note: String(r.note || ""),
+        status: String(r.status) as VipOrderRecord["status"],
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      }));
+    } catch (err) {
+      console.warn("[Orders] Không đọc được PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(VIP_ORDERS_FILE)) {
+      return JSON.parse(fs.readFileSync(VIP_ORDERS_FILE, "utf-8"));
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+async function writeVipOrders(list: VipOrderRecord[]) {
+  if (pgPool) {
+    try {
+      await pgPool.query("DELETE FROM vip_orders");
+      for (const o of list) {
+        await pgPool.query(
+          `INSERT INTO vip_orders (id, plan, phone, email, "note", status)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [o.id, o.plan, o.phone, o.email, o.note, o.status]
+        );
+      }
+      return;
+    } catch (err) {
+      console.warn("[Orders] Lỗi ghi PostgreSQL:", err);
+    }
+  }
+  fs.mkdirSync(path.dirname(VIP_ORDERS_FILE), { recursive: true });
+  fs.writeFileSync(VIP_ORDERS_FILE, JSON.stringify(list, null, 2), "utf-8");
 }
 
 const userTokens = new Map<string, string>(); // token -> userId
@@ -1713,6 +1782,73 @@ async function startServer() {
     } catch (err: any) {
       console.error("Void key error:", err);
       res.status(500).json({ error: "Không cập nhật được mã." });
+    }
+  });
+
+  // API: Học sinh đặt mua gói VIP (ghi SĐT Zalo gửi cho admin)
+  app.post("/api/vip/orders", requireUser, async (req, res) => {
+    try {
+      const plan = String(req.body?.plan || "") as keyof typeof PLAN_DURATIONS;
+      const phone = String(req.body?.phone || "").trim();
+      const note = String(req.body?.note || "").trim().slice(0, 300);
+      if (!(plan in PLAN_DURATIONS)) {
+        return res.status(400).json({ error: "Loại gói không hợp lệ." });
+      }
+      const cleanedPhone = phone.replace(/[^0-9]/g, "");
+      if (cleanedPhone.length < 9 || cleanedPhone.length > 13) {
+        return res.status(400).json({ error: "Số điện thoại Zalo không hợp lệ." });
+      }
+      const user = await getUserById((req as any).userId);
+      if (!user) return res.status(401).json({ error: "Không tìm thấy tài khoản." });
+
+      const order: VipOrderRecord = {
+        id: "ord-" + crypto.randomBytes(10).toString("hex"),
+        plan,
+        phone,
+        email: user.email,
+        note,
+        status: "new",
+        createdAt: new Date().toISOString(),
+      };
+      const existing = await readVipOrders();
+      await writeVipOrders([order, ...existing]);
+      res.status(201).json({
+        ok: true,
+        order,
+        message: `Đã gửi yêu cầu đặt mua gói ${PLAN_LABELS[plan]} cho admin. Chờ admin liên hệ SĐT ${phone} để chốt đơn nhé!`,
+      });
+    } catch (err: any) {
+      console.error("Order error:", err);
+      res.status(500).json({ error: "Không gửi được yêu cầu đặt mua." });
+    }
+  });
+
+  // API: Danh sách đơn hàng đặt mua VIP (admin)
+  app.get("/api/vip/orders", requireAdmin, async (_req, res) => {
+    try {
+      const orders = await readVipOrders();
+      res.json({ orders, total: orders.length });
+    } catch (err: any) {
+      console.error("List orders error:", err);
+      res.status(500).json({ error: "Không tải được đơn hàng." });
+    }
+  });
+
+  // API: Đánh dấu đã xử lý / mở lại đơn hàng (admin)
+  app.post("/api/vip/orders/:id/toggle", requireAdmin, async (req, res) => {
+    try {
+      const id = String(req.params.id || "");
+      const orders = await readVipOrders();
+      const order = orders.find((o) => o.id === id);
+      if (!order) {
+        return res.status(404).json({ error: "Không tìm thấy đơn hàng." });
+      }
+      order.status = order.status === "new" ? "handled" : "new";
+      await writeVipOrders(orders);
+      res.json({ ok: true, orders, message: order.status === "handled" ? "Đã đánh dấu đã xử lý." : "Đã mở lại đơn." });
+    } catch (err: any) {
+      console.error("Toggle order error:", err);
+      res.status(500).json({ error: "Không cập nhật được đơn hàng." });
     }
   });
 
