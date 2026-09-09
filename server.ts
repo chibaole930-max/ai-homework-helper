@@ -872,11 +872,13 @@ const SITE_SETTINGS_FILE = path.join(process.cwd(), "data", "site-settings.json"
 interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
+  donate: { enabled: boolean; qrImage: string; note: string };
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   maintenance: { enabled: false, message: "" },
   announcement: { enabled: false, text: "" },
+  donate: { enabled: false, qrImage: "", note: "" },
 };
 
 let cachedSiteSettings: SiteSettings | null = null;
@@ -900,6 +902,11 @@ async function readSiteSettings(): Promise<SiteSettings> {
             enabled: !!parsed.announcement?.enabled,
             text: String(parsed.announcement?.text || ""),
           },
+          donate: {
+            enabled: !!parsed.donate?.enabled,
+            qrImage: String(parsed.donate?.qrImage || ""),
+            note: String(parsed.donate?.note || ""),
+          },
         };
         return cachedSiteSettings;
       }
@@ -919,6 +926,11 @@ async function readSiteSettings(): Promise<SiteSettings> {
           enabled: !!parsed.announcement?.enabled,
           text: String(parsed.announcement?.text || ""),
         },
+        donate: {
+          enabled: !!parsed.donate?.enabled,
+          qrImage: String(parsed.donate?.qrImage || ""),
+          note: String(parsed.donate?.note || ""),
+        },
       };
       return cachedSiteSettings;
     }
@@ -928,6 +940,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
   cachedSiteSettings = {
     maintenance: { enabled: false, message: "" },
     announcement: { enabled: false, text: "" },
+    donate: { enabled: false, qrImage: "", note: "" },
   };
   return cachedSiteSettings;
 }
@@ -1043,6 +1056,7 @@ async function startServer() {
       res.json({
         maintenance: settings.maintenance,
         announcement: settings.announcement,
+        donate: settings.donate,
         now: new Date().toISOString(),
       });
     } catch (err: any) {
@@ -1107,8 +1121,9 @@ async function startServer() {
   // API: Cập nhật cài đặt (admin)
   app.post("/api/admin/settings", requireAdmin, async (req, res) => {
     try {
-      const { maintenance, announcement } = req.body || {};
+      const { maintenance, announcement, donate } = req.body || {};
       const current = await readSiteSettings();
+      const rawQr = String(donate?.qrImage ?? current.donate.qrImage).trim();
       const next: SiteSettings = {
         maintenance: {
           enabled:
@@ -1123,6 +1138,15 @@ async function startServer() {
               ? current.announcement.enabled
               : !!announcement.enabled,
           text: String(announcement?.text ?? current.announcement.text).slice(0, 2000),
+        },
+        donate: {
+          enabled:
+            donate?.enabled === undefined ? current.donate.enabled : !!donate.enabled,
+          qrImage:
+            rawQr && (rawQr.startsWith("data:image/") || rawQr.startsWith("https://") || rawQr.startsWith("/"))
+              ? rawQr.slice(0, 3000000)
+              : "",
+          note: String(donate?.note ?? current.donate.note).slice(0, 500),
         },
       };
       await writeSiteSettings(next);

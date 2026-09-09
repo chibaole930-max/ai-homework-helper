@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Shield,
   Lock,
@@ -15,11 +15,14 @@ import {
   Trash2,
   BarChart3,
   Users,
+  HeartHandshake,
+  ImagePlus,
 } from 'lucide-react';
 
 interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
+  donate: { enabled: boolean; qrImage: string; note: string };
 }
 
 interface StatsOverview {
@@ -66,6 +69,7 @@ export default function AdminTab() {
   const [password, setPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const qrInputRef = useRef<HTMLInputElement>(null);
 
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -234,6 +238,29 @@ export default function AdminTab() {
     sessionStorage.removeItem(TOKEN_KEY);
     setToken('');
     setSettings(null);
+  };
+
+  const handleQrUpload = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setSaveMsg({ ok: false, text: 'Vui lòng chọn file ảnh (PNG/JPG/WebP...).' });
+      return;
+    }
+    if (file.size > 1500 * 1024) {
+      setSaveMsg({ ok: false, text: 'Ảnh quá lớn (tối đa 1.5MB).' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      setSettings((prev) =>
+        prev ? { ...prev, donate: { ...prev.donate, qrImage: dataUrl } } : prev
+      );
+      setSaveMsg({ ok: true, text: 'Đã đọc ảnh QR thành công. Nhấn Lưu cài đặt để áp dụng.' });
+    };
+    reader.onerror = () =>
+      setSaveMsg({ ok: false, text: 'Không đọc được file ảnh.' });
+    reader.readAsDataURL(file);
   };
 
   if (!token) {
@@ -449,6 +476,132 @@ export default function AdminTab() {
           <span>
             Nhấn <b>Lưu cài đặt</b> bên dưới để áp dụng ngay. Nếu chưa kích hoạt bảo trì, banner thông
             báo sẽ hiện trên mọi trang trong ~60 giây.
+          </span>
+        </div>
+      </div>
+
+      {/* Ủng hộ / Donate */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-rose-100 text-rose-600">
+              <HeartHandshake className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800">Ủng Hộ / Donate</h2>
+              <p className="text-[11px] text-slate-500">
+                Công khai mã QR để học sinh biết ơn & ủng hộ. Hiển thị nút trên web.
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={settings?.donate.enabled || false}
+              onChange={(e) =>
+                setSettings((prev) =>
+                  prev
+                    ? { ...prev, donate: { ...prev.donate, enabled: e.target.checked } }
+                    : prev
+                )
+              }
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-rose-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:border-slate-200 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+          </label>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">
+            Ảnh mã QR nhận tiền
+          </label>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            {settings?.donate.qrImage ? (
+              <div className="relative shrink-0">
+                <img
+                  src={settings.donate.qrImage}
+                  alt="Mã QR donate"
+                  className="w-36 h-36 object-contain rounded-2xl border border-slate-200 bg-white p-1"
+                />
+                <button
+                  onClick={() =>
+                    setSettings((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            donate: {
+                              ...prev.donate,
+                              qrImage: '',
+                            },
+                          }
+                        : prev
+                    )
+                  }
+                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow"
+                  title="Xóa ảnh QR"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => qrInputRef.current?.click()}
+                className="w-36 h-36 shrink-0 rounded-2xl border-2 border-dashed border-slate-300 hover:border-rose-400 hover:bg-rose-50 flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-rose-500 transition-colors"
+              >
+                <ImagePlus className="w-7 h-7" />
+                <span className="text-[11px] font-bold">Chọn ảnh QR</span>
+              </button>
+            )}
+            <div className="flex-1 space-y-2 w-full">
+              <input
+                ref={qrInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  handleQrUpload(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                onClick={() => qrInputRef.current?.click()}
+                disabled={!settings?.donate.qrImage}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-bold rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <ImagePlus className="w-3.5 h-3.5" />
+                {settings?.donate.qrImage ? 'Đổi ảnh QR' : 'Chọn ảnh QR'}
+              </button>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Chọn ảnh mã QR (VNPAY, MoMo, ngân hàng...). File được lưu an toàn phía server, tối đa 1.5MB.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1 block">
+            Lời kêu gọi (hiện kèm mã QR cho học sinh)
+          </label>
+          <textarea
+            value={settings?.donate.note || ''}
+            onChange={(e) =>
+              setSettings((prev) =>
+                prev
+                  ? { ...prev, donate: { ...prev.donate, note: e.target.value } }
+                  : prev
+              )
+            }
+            rows={2}
+            placeholder="VD: Cảm ơn bạn đã ủng hộ để web duy trì miễn phí cho mọi học sinh!"
+            className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none"
+          />
+        </div>
+
+        <div className="px-3 py-2 rounded-xl bg-slate-50 text-[11px] text-slate-500 flex items-start gap-1.5">
+          <HeartHandshake className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            Khi bật và có ảnh QR, web sẽ hiện nút{' '}
+            <b className="text-rose-500">Ủng hộ</b> góc trái màn hình. Bấm vào để xem mã QR.
           </span>
         </div>
       </div>

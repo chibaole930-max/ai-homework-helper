@@ -13,7 +13,7 @@ import AdminTab from './components/AdminTab';
 import { SavedStudyItem, GradeId } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
-import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench } from 'lucide-react';
+import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench, HeartHandshake } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
@@ -21,6 +21,7 @@ const ANNOUNCE_KEY = 'announcement_dismissed_v1';
 interface SiteStatus {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
+  donate: { enabled: boolean; qrImage: string; note: string };
 }
 
 export default function App() {
@@ -32,6 +33,11 @@ export default function App() {
   );
   const [siteStatus, setSiteStatus] = useState<SiteStatus | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [donateVisible, setDonateVisible] = useState(false);
+
+  const donateEnabled = !!(
+    siteStatus?.donate?.enabled && siteStatus.donate.qrImage
+  );
 
   useEffect(() => {
     const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
@@ -332,6 +338,63 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Donate QR Popup */}
+      {donateVisible && siteStatus?.donate?.qrImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-announce-backdrop"
+            onClick={() => setDonateVisible(false)}
+          />
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-announce-in">
+            <div className="bg-gradient-to-br from-rose-500 via-pink-500 to-rose-400 px-5 pt-5 pb-14 relative">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 text-white ring-1 ring-white/30">
+                <HeartHandshake className="w-6 h-6" />
+              </div>
+              <h2 className="mt-3 text-lg font-extrabold text-white">
+                Ủng hộ & tiếp sức
+              </h2>
+              <p className="mt-1 text-xs text-rose-100">
+                Mọi sự đóng góp giúp web duy trì miễn phí cho mọi học sinh.
+              </p>
+              <div className="absolute -bottom-6 left-0 right-0 h-12 bg-white rounded-t-[40px]" />
+            </div>
+            <div className="px-5 pt-9 pb-5 flex flex-col items-center">
+              <img
+                src={siteStatus.donate.qrImage}
+                alt="Mã QR ủng hộ"
+                className="w-56 h-56 object-contain rounded-2xl border border-slate-200 bg-white p-2"
+              />
+              {siteStatus.donate.note && (
+                <p className="mt-4 text-sm text-slate-700 leading-relaxed text-center whitespace-pre-wrap">
+                  {siteStatus.donate.note}
+                </p>
+              )}
+              <button
+                onClick={() => setDonateVisible(false)}
+                className="mt-6 w-full py-3 text-sm font-bold rounded-2xl bg-rose-500 hover:bg-rose-600 active:scale-[0.99] transition-all text-white flex items-center justify-center gap-2"
+              >
+                <HeartHandshake className="w-4 h-4" />
+                Chân thành cảm ơn bạn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Donate Floating Button */}
+      {donateEnabled && (
+        <button
+          onClick={() => setDonateVisible(true)}
+          className="fixed bottom-5 left-5 z-40 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-200 active:scale-95 transition-all font-bold text-xs sm:text-sm"
+        >
+          <span className="relative flex w-2 h-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-60" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+          </span>
+          Ủng hộ
+        </button>
       )}
 
       {/* Toast Notification */}
