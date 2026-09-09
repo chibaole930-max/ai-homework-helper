@@ -68,7 +68,7 @@ function rowToPreset(row: any): CommunityPresetItem {
     author: row.author,
     likes: row.likes,
     views: Number(row.views || 0),
-    grade: row.grade || undefined,
+    grade: row.grade || "12",
     createdAt: row.createdAt instanceof Date
       ? row.createdAt.toISOString()
       : String(row.createdAt),
@@ -199,11 +199,19 @@ function communitySeedList(): CommunityPresetItem[] {
 }
 
 // Đọc file JSON, nếu chưa có thì dùng seed mặc định (để like/view trên bài seed vẫn lưu được).
+// Item cũ thiếu grade (dữ liệu lưu trước khi có tính năng phân lớp) => mặc định lớp 12.
 function readCommunityListOrSeed(): CommunityPresetItem[] {
   try {
     if (fs.existsSync(COMMUNITY_DATA_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(COMMUNITY_DATA_FILE, "utf-8"));
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map((x: any) => ({
+          ...x,
+          grade: String(x.grade || "12").trim() || "12",
+          views: Number(x.views || 0),
+          likes: Number(x.likes || 0),
+        }));
+      }
     }
   } catch (err) {
     console.warn("[Community] Không đọc được dữ liệu JSON, dùng seed mặc định:", err);
