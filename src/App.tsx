@@ -17,6 +17,7 @@ import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench, Hea
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
+const DONATE_SESSION_KEY = 'donate_shown_session_v1';
 
 interface SiteStatus {
   maintenance: { enabled: boolean; message: string };
@@ -115,7 +116,20 @@ export default function App() {
   const dismissAnnouncement = () => {
     if (announcementText) localStorage.setItem(ANNOUNCE_KEY, announcementText);
     setAnnouncementVisible(false);
+    openDonateOnce();
   };
+
+  const openDonateOnce = () => {
+    if (!donateEnabled) return;
+    if (sessionStorage.getItem(DONATE_SESSION_KEY) === '1') return;
+    sessionStorage.setItem(DONATE_SESSION_KEY, '1');
+    setDonateVisible(true);
+  };
+
+  useEffect(() => {
+    if (announcementText) return;
+    openDonateOnce();
+  }, [donateEnabled, announcementText]);
 
   // Initialize saved items from localStorage or fallback to default sample presets
   const [savedItems, setSavedItems] = useState<SavedStudyItem[]>(() => {
@@ -381,20 +395,6 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Donate Floating Button */}
-      {donateEnabled && (
-        <button
-          onClick={() => setDonateVisible(true)}
-          className="fixed bottom-5 left-5 z-40 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-200 active:scale-95 transition-all font-bold text-xs sm:text-sm"
-        >
-          <span className="relative flex w-2 h-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-60" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-          </span>
-          Ủng hộ
-        </button>
       )}
 
       {/* Toast Notification */}

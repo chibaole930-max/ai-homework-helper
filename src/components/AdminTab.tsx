@@ -600,8 +600,8 @@ export default function AdminTab() {
         <div className="px-3 py-2 rounded-xl bg-slate-50 text-[11px] text-slate-500 flex items-start gap-1.5">
           <HeartHandshake className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
-            Khi bật và có ảnh QR, web sẽ hiện nút{' '}
-            <b className="text-rose-500">Ủng hộ</b> góc trái màn hình. Bấm vào để xem mã QR.
+            Khi bật và có ảnh QR, web sẽ <b className="text-rose-500">tự động hiện popup</b>{' '}
+            ủng hộ khi học sinh vào web (1 lần/mỗi phiên truy cập).
           </span>
         </div>
       </div>
