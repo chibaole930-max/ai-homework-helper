@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+@keyframes announce-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.animate-announce-in {
+  animation: announce-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes announce-backdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-announce-backdrop {
+  animation: announce-backdrop 0.25s ease-out both;
+}
+
 .scrollbar-none {
   scrollbar-width: none;
   -ms-overflow-style: none;

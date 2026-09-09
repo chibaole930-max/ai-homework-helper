@@ -13,7 +13,7 @@ import AdminTab from './components/AdminTab';
 import { SavedStudyItem, GradeId } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
-import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, X, Wrench } from 'lucide-react';
+import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
@@ -31,6 +31,7 @@ export default function App() {
     () => window.location.hash === '#/admin'
   );
   const [siteStatus, setSiteStatus] = useState<SiteStatus | null>(null);
+  const [onlineCount, setOnlineCount] = useState(0);
 
   useEffect(() => {
     const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
@@ -65,6 +66,25 @@ export default function App() {
     load();
     const t = window.setInterval(load, 60000);
     return () => window.clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const ping = () => {
+      fetch('/api/online')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && typeof d.online === 'number') setOnlineCount(d.online);
+        })
+        .catch(() => {});
+    };
+    ping();
+    const t = window.setInterval(ping, 30000);
+    const onFocus = () => ping();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -204,6 +224,7 @@ export default function App() {
           savedCount={savedItems.length}
           grade={grade}
           onGradeChange={setGrade}
+          onlineCount={onlineCount}
         />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
@@ -232,24 +253,11 @@ export default function App() {
         savedCount={savedItems.length}
         grade={grade}
         onGradeChange={setGrade}
+        onlineCount={onlineCount}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {announcementVisible && announcementText && (
-          <div className="mb-4 px-4 py-3 rounded-2xl border border-sky-200 bg-sky-50 text-sky-900 text-sm flex items-start gap-2.5">
-            <Megaphone className="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" />
-            <span className="flex-1 leading-relaxed">{announcementText}</span>
-            <button
-              onClick={dismissAnnouncement}
-              className="p-1 rounded-md hover:bg-sky-100 text-sky-400"
-              aria-label="Đóng thông báo"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         {activeTab === 'notes' && (
           <LessonNoteTab
             onSaveNote={handleSaveItem}
@@ -292,6 +300,39 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Announcement Popup Modal */}
+      {announcementVisible && announcementText && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-announce-backdrop"
+            onClick={dismissAnnouncement}
+          />
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-announce-in">
+            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 px-5 pt-5 pb-14 relative">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 text-white ring-1 ring-white/30">
+                <Megaphone className="w-6 h-6" />
+              </div>
+              <h2 className="mt-3 text-lg font-extrabold text-white">
+                Thông báo từ hệ thống
+              </h2>
+              <div className="absolute -bottom-6 left-0 right-0 h-12 bg-white rounded-t-[40px]" />
+            </div>
+            <div className="px-5 pt-9 pb-5">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {announcementText}
+              </p>
+              <button
+                onClick={dismissAnnouncement}
+                className="mt-6 w-full py-3 text-sm font-bold rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] transition-all text-white flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Đã rõ, tiếp tục học
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (

@@ -587,6 +587,20 @@ async function generateContentWithFallback(
 // GIỚI HẠN SỐ LẦN SOẠN BÀI MIỄN PHÍ (3 lượt/ngày tính theo IP)
 // ---------------------------------------------------------------------------
 
+const ONLINE_SESSIONS = new Map<string, number>();
+const ONLINE_TTL_MS = 5 * 60 * 1000;
+
+// Ghi nhận phiên truy cập mới nhất cho 1 IP rồi đếm số phiên còn trong cửa sổ
+// 5 phút. Bị gọi mỗi lần client heartbeat (poll /api/online).
+function touchOnlineSession(ip: string): number {
+  const now = Date.now();
+  if (ip && ip !== "unknown") ONLINE_SESSIONS.set(ip, now);
+  for (const [k, v] of ONLINE_SESSIONS) {
+    if (now - v > ONLINE_TTL_MS) ONLINE_SESSIONS.delete(k);
+  }
+  return ONLINE_SESSIONS.size;
+}
+
 const USAGE_LIMIT_PER_DAY = 3;
 const USAGE_DATA_FILE = path.join(process.cwd(), "data", "usage.json");
 
@@ -1008,6 +1022,17 @@ async function startServer() {
     } catch (err: any) {
       console.error("Error reading usage:", err);
       res.status(500).json({ error: "Không đọc được trạng thái lượt soạn bài." });
+    }
+  });
+
+  // API: Số người đang online (theo phiên truy cập ~5 phút, heartbeat)
+  app.get("/api/online", (req, res) => {
+    try {
+      const online = touchOnlineSession(req.ip || "");
+      res.json({ online, windowMinutes: ONLINE_TTL_MS / 60000 });
+    } catch (err: any) {
+      console.error("Error reading online count:", err);
+      res.status(500).json({ error: "Không đọc được số người online." });
     }
   });
 
