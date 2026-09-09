@@ -734,7 +734,7 @@ async function generateContentWithFallback(
 }
 
 // ---------------------------------------------------------------------------
-// GIỚI HẠN SỐ LẦN SOẠN BÀI MIỄN PHÍ (3 lượt/ngày tính theo IP)
+// GIỚI HẠN SỐ LẦN SOẠN BÀI MIỄN PHÍ (2 lượt/ngày tính theo IP)
 // ---------------------------------------------------------------------------
 
 const ONLINE_SESSIONS = new Map<string, number>();
@@ -751,7 +751,7 @@ function touchOnlineSession(ip: string): number {
   return ONLINE_SESSIONS.size;
 }
 
-const USAGE_LIMIT_PER_DAY = 3;
+const USAGE_LIMIT_PER_DAY = 2;
 const USAGE_DATA_FILE = path.join(process.cwd(), "data", "usage.json");
 
 function usageKey(req: express.Request): string {
@@ -1167,7 +1167,7 @@ function publicUser(user: UserRecord, vip: boolean) {
   };
 }
 
-// Kiểm tra hạn mức AI miễn phí (3 lượt/ngày/IP); VIP dùng không giới hạn.
+// Kiểm tra hạn mức AI miễn phí (2 lượt/ngày/IP); VIP dùng không giới hạn.
 // Trả về true nếu được dùng; false nếu đã tự gửi response 429.
 async function checkAiUsageLimit(
   req: express.Request,

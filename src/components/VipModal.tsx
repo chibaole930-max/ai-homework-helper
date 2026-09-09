@@ -172,7 +172,7 @@ export const VipModal: React.FC = () => {
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
               <p className="text-sm font-bold text-slate-700">Tài khoản: {user.email}</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Chưa kích hoạt VIP — AI còn giới hạn 3 lượt/ngày
+                Chưa kích hoạt VIP — AI còn giới hạn 2 lượt/ngày
               </p>
             </div>
           )}

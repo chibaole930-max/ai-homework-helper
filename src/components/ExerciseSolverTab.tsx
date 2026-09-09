@@ -62,7 +62,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
   const [solution, setSolution] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Hạn mức AI miễn phí (3 lượt/ngày theo IP); VIP không giới hạn
+  // Hạn mức AI miễn phí (2 lượt/ngày theo IP); VIP không giới hạn
   const [usage, setUsage] = useState<{
     limit: number;
     used: number;
