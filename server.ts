@@ -474,8 +474,14 @@ async function rejectPendingPreset(id: string): Promise<boolean> {
   return true;
 }
 
+function getSiteGeminiApiKey(): string | null {
+  const fromSettings = cachedSiteSettings?.ai?.geminiKey?.trim();
+  if (fromSettings) return fromSettings;
+  return process.env.GEMINI_API_KEY || null;
+}
+
 function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getSiteGeminiApiKey();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not set in the environment.");
   }
@@ -1230,12 +1236,14 @@ interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
+  ai: { geminiKey: string };
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   maintenance: { enabled: false, message: "" },
   announcement: { enabled: false, text: "" },
   donate: { enabled: false, qrImage: "", note: "" },
+  ai: { geminiKey: "" },
 };
 
 let cachedSiteSettings: SiteSettings | null = null;
@@ -1264,6 +1272,9 @@ async function readSiteSettings(): Promise<SiteSettings> {
             qrImage: String(parsed.donate?.qrImage || ""),
             note: String(parsed.donate?.note || ""),
           },
+          ai: {
+            geminiKey: String(parsed.ai?.geminiKey || ""),
+          },
         };
         return cachedSiteSettings;
       }
@@ -1275,20 +1286,23 @@ async function readSiteSettings(): Promise<SiteSettings> {
     if (fs.existsSync(SITE_SETTINGS_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(SITE_SETTINGS_FILE, "utf-8"));
       cachedSiteSettings = {
-        maintenance: {
-          enabled: !!parsed.maintenance?.enabled,
-          message: String(parsed.maintenance?.message || ""),
-        },
-        announcement: {
-          enabled: !!parsed.announcement?.enabled,
-          text: String(parsed.announcement?.text || ""),
-        },
-        donate: {
-          enabled: !!parsed.donate?.enabled,
-          qrImage: String(parsed.donate?.qrImage || ""),
-          note: String(parsed.donate?.note || ""),
-        },
-      };
+          maintenance: {
+            enabled: !!parsed.maintenance?.enabled,
+            message: String(parsed.maintenance?.message || ""),
+          },
+          announcement: {
+            enabled: !!parsed.announcement?.enabled,
+            text: String(parsed.announcement?.text || ""),
+          },
+          donate: {
+            enabled: !!parsed.donate?.enabled,
+            qrImage: String(parsed.donate?.qrImage || ""),
+            note: String(parsed.donate?.note || ""),
+          },
+          ai: {
+            geminiKey: String(parsed.ai?.geminiKey || ""),
+          },
+        };
       return cachedSiteSettings;
     }
   } catch {
@@ -1298,6 +1312,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
     maintenance: { enabled: false, message: "" },
     announcement: { enabled: false, text: "" },
     donate: { enabled: false, qrImage: "", note: "" },
+    ai: { geminiKey: "" },
   };
   return cachedSiteSettings;
 }
@@ -1514,6 +1529,11 @@ async function startServer() {
               ? rawQr.slice(0, 3000000)
               : "",
           note: String(donate?.note ?? current.donate.note).slice(0, 500),
+        },
+        ai: {
+          geminiKey: String(req.body?.ai?.geminiKey ?? current.ai.geminiKey)
+            .trim()
+            .slice(0, 500),
         },
       };
       await writeSiteSettings(next);

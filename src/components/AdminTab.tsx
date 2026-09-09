@@ -27,12 +27,14 @@ import {
   Phone,
   Mail,
   BadgeCheck,
+  EyeOff,
 } from 'lucide-react';
 
 interface SiteSettings {
   maintenance: { enabled: boolean; message: string };
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
+  ai: { geminiKey: string };
 }
 
 interface StatsOverview {
@@ -110,6 +112,7 @@ export default function AdminTab() {
   >(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersMsg, setOrdersMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [showAiKey, setShowAiKey] = useState(false);
 
   const loadOrders = async () => {
     if (!token) return;
@@ -779,6 +782,63 @@ export default function AdminTab() {
             Khi bật và có ảnh QR, web sẽ <b className="text-rose-500">tự động hiện popup</b>{' '}
             ủng hộ khi học sinh vào web (1 lần/mỗi phiên truy cập).
           </span>
+        </div>
+      </div>
+
+      {/* Cài đặt API Key AI */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2.5">
+          <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600">
+            <KeyRound className="w-4.5 h-4.5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-800">API Key AI (Gemini)</h2>
+            <p className="text-[11px] text-slate-500">
+              Nhập key mới để thay đổi key đang dùng cho AI. Không lộ cho học sinh.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1 block">Gemini API Key</label>
+          <div className="relative">
+            <input
+              type={showAiKey ? 'text' : 'password'}
+              value={settings?.ai?.geminiKey || ''}
+              onChange={(e) =>
+                setSettings((prev) =>
+                  prev
+                    ? { ...prev, ai: { ...prev.ai, geminiKey: e.target.value.trim() } }
+                    : prev
+                )
+              }
+              placeholder="AIza..."
+              autoComplete="off"
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pr-11 text-sm font-mono focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setShowAiKey((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              {showAiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="px-3 py-2 rounded-xl bg-indigo-50/50 text-[11px] text-slate-500 flex items-start gap-1.5">
+          <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0 text-indigo-500" />
+          <div className="space-y-1">
+            <p>
+              Để thay đổi key: nhập key mới rồi bấm <b className="text-indigo-600">Lưu cài đặt</b>{' '}
+              ở cuối trang. Key lưu ngay lập tức áp dụng.
+            </p>
+            <p>
+              Để <b className="text-slate-600">trả về dùng key môi trường</b> (biến{' '}
+              <code className="font-mono text-indigo-600">GEMINI_API_KEY</code> trên Render): xóa
+              trống ô trên rồi lưu.
+            </p>
+          </div>
         </div>
       </div>
 
