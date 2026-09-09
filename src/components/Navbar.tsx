@@ -5,8 +5,11 @@ import {
   FolderHeart,
   Sparkles,
   Library,
+  Crown,
+  LogOut,
 } from 'lucide-react';
 import { GradeId } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export type TabType = 'notes' | 'solver' | 'saved' | 'presets';
 
@@ -28,6 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onlineCount = 0,
 }) => {
   const gradeLabel = `Lớp ${grade}`;
+  const { user, openAuth, openVip, logout } = useAuth();
+  const isVip = user?.isVip ?? false;
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -93,6 +98,46 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {g}
               </button>
             ))}
+          </div>
+
+          {/* Auth & VIP */}
+          <div className="flex items-center gap-1.5 self-start lg:self-auto shrink-0">
+            <button
+              onClick={openVip}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 shadow-sm ${
+                isVip
+                  ? 'bg-gradient-to-tr from-amber-400 to-yellow-500 text-white hover:opacity-90'
+                  : 'bg-gradient-to-tr from-amber-500 to-orange-500 text-white hover:opacity-90'
+              }`}
+            >
+              <Crown className="w-3.5 h-3.5 text-yellow-200" />
+              {isVip ? 'VIP' : 'Nâng cấp VIP'}
+            </button>
+
+            {user ? (
+              <>
+                <span
+                  title={user.email}
+                  className="max-w-[120px] truncate px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700"
+                >
+                  {user.name || user.email.split('@')[0]}
+                </span>
+                <button
+                  onClick={logout}
+                  title="Đăng xuất"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={openAuth}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+              >
+                Đăng nhập
+              </button>
+            )}
           </div>
 
           {/* Navigation Tabs */}

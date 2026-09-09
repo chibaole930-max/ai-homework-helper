@@ -12,6 +12,8 @@ import {
 import { SubjectIcon } from './SubjectIcon';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { CurriculumBrowser } from './CurriculumBrowser';
+import { useAuth } from '../context/AuthContext';
+import { authHeaders } from '../lib/auth';
 import {
   Sparkles,
   BookOpen,
@@ -35,6 +37,7 @@ import {
   X,
   Loader2,
   Send,
+  Crown,
 } from 'lucide-react';
 
 interface LessonNoteTabProps {
@@ -70,12 +73,14 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Giới hạn lượt soạn bài miễn phí (3 lượt/ngày theo IP)
+  // Hạn mức AI miễn phí (3 lượt/ngày theo IP); VIP không giới hạn
   const [usage, setUsage] = useState<{
     limit: number;
     used: number;
     remaining: number;
+    isVip?: boolean;
   } | null>(null);
+  const { user, openVip } = useAuth();
   // Chia sẻ bài mẫu lên Kho chung
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTitle, setShareTitle] = useState('');
@@ -87,13 +92,13 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const outputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/usage/status')
+    fetch('/api/usage/status', { headers: authHeaders() })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setUsage(d);
       })
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   const openShareModal = () => {
     setShareTitle(lessonTitle.trim() || `Bài ghi ${currentSubject.shortName}`);
@@ -197,9 +202,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
     try {
       const response = await fetch('/api/lesson-note', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
           subject: currentSubject.name,
           subjectId: currentSubject.id,
@@ -295,22 +298,40 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         <div className="absolute right-0 -bottom-10 w-72 h-72 bg-white/10 rounded-full blur-2xl pointer-events-none" />
       </div>
 
-      {/* Hạn mức lượt soạn bài miễn phí hôm nay */}
-      {usage && usage.remaining > 0 && (
+      {/* Hạn mức AI miễn phí hôm nay */}
+      {usage?.isVip && (
+        <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-emerald-50/80 border-emerald-200 text-emerald-800">
+          <span className="font-medium flex items-center gap-1.5">
+            <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            Bạn là <b>VIP</b>: AI dùng không giới hạn hôm nay!
+          </span>
+          <span className="font-bold text-[11px] bg-emerald-600 text-white px-2 py-1 rounded-lg whitespace-nowrap">
+            VIP ● ∞
+          </span>
+        </div>
+      )}
+      {usage && !usage.isVip && usage.remaining > 0 && (
         <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-indigo-50/70 border-indigo-100 text-indigo-800">
           <span className="font-medium flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
-            Soạn bài miễn phí hôm nay: còn{' '}
+            AI miễn phí hôm nay: còn{' '}
             <b className="text-indigo-900">{usage.remaining}/{usage.limit}</b> lượt
           </span>
         </div>
       )}
-      {usage && usage.remaining <= 0 && (
-        <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-amber-50 border-amber-200 text-amber-800">
-          <span className="font-medium flex items-center gap-1.5">
+      {usage && !usage.isVip && usage.remaining <= 0 && (
+        <div className="px-4 py-3 rounded-xl border flex items-center justify-between gap-3 text-xs bg-amber-50 border-amber-200 text-amber-800">
+          <span className="font-medium flex items-center gap-1.5 leading-relaxed">
             <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-            Bạn đã dùng hết {usage.limit} lượt soạn bài miễn phí hôm nay. Hạn mức sẽ reset vào ngày mai.
+            Bạn đã dùng hết {usage.limit} lượt AI miễn phí hôm nay.
           </span>
+          <button
+            onClick={openVip}
+            className="flex items-center gap-1 font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors"
+          >
+            <Crown className="w-3.5 h-3.5 text-yellow-300" />
+            Nâng cấp VIP
+          </button>
         </div>
       )}
 

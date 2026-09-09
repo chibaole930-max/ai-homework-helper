@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SubjectId,
   TextbookSeries,
@@ -10,6 +10,8 @@ import {
 } from '../types';
 import { SubjectIcon } from './SubjectIcon';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useAuth } from '../context/AuthContext';
+import { authHeaders } from '../lib/auth';
 import {
   Sparkles,
   Camera,
@@ -29,6 +31,7 @@ import {
   ChevronRight,
   ArrowRight,
   ExternalLink,
+  Crown,
 } from 'lucide-react';
 
 interface ExerciseSolverTabProps {
@@ -59,7 +62,24 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
   const [solution, setSolution] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Hạn mức AI miễn phí (3 lượt/ngày theo IP); VIP không giới hạn
+  const [usage, setUsage] = useState<{
+    limit: number;
+    used: number;
+    remaining: number;
+    isVip?: boolean;
+  } | null>(null);
+  const { user, openVip } = useAuth();
   const outputRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/usage/status', { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setUsage(d);
+      })
+      .catch(() => {});
+  }, [user]);
 
   const scrollOutputIntoView = () => {
     if (window.matchMedia('(min-width: 1024px)').matches) return;
@@ -123,9 +143,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
     try {
       const response = await fetch('/api/solve-exercise', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
           subject: currentSubject.name,
           textbook: selectedTextbook,
@@ -175,9 +193,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
     try {
       const response = await fetch('/api/tutor-followup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
           subject: currentSubject.name,
           originalProblem: problemText,
@@ -265,6 +281,43 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
         </div>
         <div className="absolute right-0 -bottom-10 w-72 h-72 bg-white/10 rounded-full blur-2xl pointer-events-none" />
       </div>
+
+      {/* Hạn mức AI miễn phí hôm nay */}
+      {usage?.isVip && (
+        <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-emerald-50/80 border-emerald-200 text-emerald-800">
+          <span className="font-medium flex items-center gap-1.5">
+            <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            Bạn là <b>VIP</b>: AI dùng không giới hạn hôm nay!
+          </span>
+          <span className="font-bold text-[11px] bg-emerald-600 text-white px-2 py-1 rounded-lg whitespace-nowrap">
+            VIP ● ∞
+          </span>
+        </div>
+      )}
+      {usage && !usage.isVip && usage.remaining > 0 && (
+        <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-blue-50/70 border-blue-100 text-blue-800">
+          <span className="font-medium flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            AI miễn phí hôm nay: còn{' '}
+            <b className="text-blue-900">{usage.remaining}/{usage.limit}</b> lượt (chung cả soạn bài & giải bài)
+          </span>
+        </div>
+      )}
+      {usage && !usage.isVip && usage.remaining <= 0 && (
+        <div className="px-4 py-3 rounded-xl border flex items-center justify-between gap-3 text-xs bg-amber-50 border-amber-200 text-amber-800">
+          <span className="font-medium flex items-center gap-1.5 leading-relaxed">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            Bạn đã dùng hết {usage.limit} lượt AI miễn phí hôm nay.
+          </span>
+          <button
+            onClick={openVip}
+            className="flex items-center gap-1 font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors"
+          >
+            <Crown className="w-3.5 h-3.5 text-yellow-300" />
+            Nâng cấp VIP
+          </button>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

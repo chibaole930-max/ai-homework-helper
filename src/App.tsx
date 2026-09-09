@@ -10,6 +10,9 @@ import { ExerciseSolverTab } from './components/ExerciseSolverTab';
 import { SavedNotesTab } from './components/SavedNotesTab';
 import { PresetLibraryTab } from './components/PresetLibraryTab';
 import AdminTab from './components/AdminTab';
+import { AuthProvider } from './context/AuthContext';
+import { AuthModal } from './components/AuthModal';
+import { VipModal } from './components/VipModal';
 import { SavedStudyItem, GradeId } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
@@ -25,7 +28,7 @@ interface SiteStatus {
   donate: { enabled: boolean; qrImage: string; note: string };
 }
 
-export default function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('notes');
   const [grade, setGrade] = useState<GradeId>('12');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -397,6 +400,10 @@ export default function App() {
         </div>
       )}
 
+      {/* Auth & VIP Modals */}
+      <AuthModal />
+      <VipModal />
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-medium animate-bounce-short">
@@ -424,5 +431,13 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

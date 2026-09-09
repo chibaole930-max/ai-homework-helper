@@ -703,6 +703,281 @@ async function ensureUsageTable(pool: Pool) {
       PRIMARY KEY (day, ip)
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      nickname TEXT NOT NULL DEFAULT '',
+      "vipUntil" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS license_keys (
+      code TEXT PRIMARY KEY,
+      plan TEXT NOT NULL,
+      days INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'unused',
+      "note" TEXT NOT NULL DEFAULT '',
+      "usedByEmail" TEXT,
+      "usedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+// ---------------------------------------------------------------------------
+// TÀI KHOẢN NGƯỜI DÙNG + GÓI VIP (đăng ký/đăng nhập + mã kích hoạt theo ngày)
+// - Người dùng đăng ký email + mật khẩu (hash bằng crypto.scrypt).
+// - Mã kích hoạt VIP do admin sinh (1 tháng / 3 tháng / 1 năm), bán qua QR
+//   Momo/chuyển khoản cá nhân; học sinh nhập mã -> VIP đếm lùi theo ngày.
+// - VIP mở: AI không giới hạn + xem Kho bài mẫu cộng đồng.
+// - Lưu PostgreSQL (bảng users + license_keys) hoặc file JSON fallback.
+// ---------------------------------------------------------------------------
+
+const USERS_FILE = path.join(process.cwd(), "data", "users.json");
+const LICENSE_KEYS_FILE = path.join(process.cwd(), "data", "license-keys.json");
+
+const PLAN_DURATIONS: Record<string, number> = {
+  "1m": 30,
+  "3m": 90,
+  "1y": 365,
+};
+const PLAN_LABELS: Record<string, string> = {
+  "1m": "1 tháng",
+  "3m": "3 tháng",
+  "1y": "1 năm",
+};
+
+interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  vipUntil: string | null;
+  createdAt: string;
+}
+
+interface LicenseKeyRecord {
+  code: string;
+  plan: keyof typeof PLAN_DURATIONS;
+  days: number;
+  status: "unused" | "used" | "void";
+  note: string;
+  usedByEmail: string | null;
+  usedAt: string | null;
+  createdAt: string;
+}
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const candidate = crypto.scryptSync(password, salt, 64).toString("hex");
+  const a = Buffer.from(hash, "hex");
+  const b = Buffer.from(candidate, "hex");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function generateLicenseCodes(count: number, prefix: string): string[] {
+  const out: string[] = [];
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  for (let i = 0; i < count; i++) {
+    const rand = () =>
+      alphabet[Math.floor(Math.random() * alphabet.length)];
+    out.push(
+      `${prefix}-${Array.from({ length: 4 }, rand).join("")}-${Array.from(
+        { length: 4 },
+        rand
+      ).join("")}-${Array.from({ length: 4 }, rand).join("")}`
+    );
+  }
+  return out;
+}
+
+async function readUsers(): Promise<UserRecord[]> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query('SELECT * FROM users ORDER BY "createdAt" DESC');
+      return rows.map((r) => ({
+        id: String(r.id),
+        email: String(r.email),
+        name: String(r.nickname || ""),
+        passwordHash: String(r.password_hash),
+        vipUntil: r.vipUntil ? new Date(r.vipUntil).toISOString() : null,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      }));
+    } catch (err) {
+      console.warn("[Users] Không đọc được PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      return JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+async function writeUsers(list: UserRecord[]) {
+  if (pgPool) {
+    for (const u of list) {
+      try {
+        await pgPool.query(
+          `INSERT INTO users (id, email, password_hash, nickname, "vipUntil")
+           VALUES ($1,$2,$3,$4,$5)
+           ON CONFLICT (email) DO UPDATE SET
+             password_hash = EXCLUDED.password_hash,
+             nickname = EXCLUDED.nickname,
+             "vipUntil" = COALESCE(EXCLUDED."vipUntil", users."vipUntil")`,
+          [u.id, u.email, u.passwordHash, u.name, u.vipUntil]
+        );
+      } catch (err) {
+        console.warn("[Users] Lỗi ghi PostgreSQL:", err);
+      }
+    }
+    return;
+  }
+  fs.mkdirSync(path.dirname(USERS_FILE), { recursive: true });
+  fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+async function getUserByEmail(email: string): Promise<UserRecord | null> {
+  const list = await readUsers();
+  return list.find((u) => u.email === email.toLowerCase()) || null;
+}
+
+async function getUserById(id: string): Promise<UserRecord | null> {
+  const list = await readUsers();
+  return list.find((u) => u.id === id) || null;
+}
+
+async function upsertUser(user: UserRecord) {
+  const list = await readUsers();
+  const idx = list.findIndex((u) => u.id === user.id);
+  if (idx >= 0) list[idx] = user;
+  else list.unshift(user);
+  await writeUsers(list);
+}
+
+async function isVip(user: UserRecord): Promise<boolean> {
+  if (!user.vipUntil) return false;
+  const until = new Date(user.vipUntil);
+  if (until.getTime() <= Date.now()) return false;
+  return true;
+}
+
+async function readLicenseKeys(): Promise<LicenseKeyRecord[]> {
+  if (pgPool) {
+    try {
+      const { rows } = await pgPool.query('SELECT * FROM license_keys ORDER BY "createdAt" DESC');
+      return rows.map((r) => ({
+        code: String(r.code),
+        plan: String(r.plan) as LicenseKeyRecord["plan"],
+        days: Number(r.days),
+        status: String(r.status) as LicenseKeyRecord["status"],
+        note: String(r.note || ""),
+        usedByEmail: r.usedByEmail ? String(r.usedByEmail) : null,
+        usedAt: r.usedAt ? new Date(r.usedAt).toISOString() : null,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      }));
+    } catch (err) {
+      console.warn("[License] Không đọc được PostgreSQL:", err);
+    }
+  }
+  try {
+    if (fs.existsSync(LICENSE_KEYS_FILE)) {
+      return JSON.parse(fs.readFileSync(LICENSE_KEYS_FILE, "utf-8"));
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+async function writeLicenseKeys(list: LicenseKeyRecord[]) {
+  if (pgPool) {
+    try {
+      // Đơn giản: ghi đè toàn bộ (số key nhỏ)
+      await pgPool.query("DELETE FROM license_keys");
+      for (const k of list) {
+        await pgPool.query(
+          `INSERT INTO license_keys
+             (code, plan, days, status, "note", "usedByEmail", "usedAt")
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [k.code, k.plan, k.days, k.status, k.note, k.usedByEmail, k.usedAt]
+        );
+      }
+      return;
+    } catch (err) {
+      console.warn("[License] Lỗi ghi PostgreSQL:", err);
+    }
+  }
+  fs.mkdirSync(path.dirname(LICENSE_KEYS_FILE), { recursive: true });
+  fs.writeFileSync(LICENSE_KEYS_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+const userTokens = new Map<string, string>(); // token -> userId
+const USER_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function requireUser(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const userId = token ? userTokens.get(token) : undefined;
+  if (!token || !userId) {
+    return res.status(401).json({
+      error: "Chưa đăng nhập.",
+      code: "NOT_AUTHED",
+    });
+  }
+  (req as any).userId = userId;
+  next();
+}
+
+// Trả về thông tin người dùng công khai (không lộ password)
+function publicUser(user: UserRecord, vip: boolean) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    isVip: vip,
+    vipUntil: user.vipUntil,
+  };
+}
+
+// Kiểm tra hạn mức AI miễn phí (3 lượt/ngày/IP); VIP dùng không giới hạn.
+// Trả về true nếu được dùng; false nếu đã tự gửi response 429.
+async function checkAiUsageLimit(
+  req: express.Request,
+  res: express.Response
+): Promise<boolean> {
+  const userId = (req as any).userId;
+  if (userId) {
+    const user = await getUserById(userId);
+    if (user && (await isVip(user))) return true;
+  }
+  const used = await readUsageCount(usageKey(req));
+  if (used >= USAGE_LIMIT_PER_DAY) {
+    res.status(429).json({
+      error: `Bạn đã dùng hết ${USAGE_LIMIT_PER_DAY} lượt AI miễn phí hôm nay. Nâng cấp VIP để dùng không giới hạn!`,
+      usage: { limit: USAGE_LIMIT_PER_DAY, used, remaining: 0 },
+      vipRequired: true,
+    });
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1033,15 +1308,25 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // API: Trạng thái lượt soạn bài miễn phí hôm nay (theo IP)
+  // API: Trạng thái lượt AI miễn phí hôm nay (theo IP; VIP không giới hạn)
   app.get("/api/usage/status", async (req, res) => {
     try {
       const used = await readUsageCount(usageKey(req));
+      const auth = (req.headers.authorization || "").startsWith("Bearer ")
+        ? (req.headers.authorization || "").slice(7)
+        : "";
+      const userId = auth ? userTokens.get(auth) : undefined;
+      let isVipUser = false;
+      if (userId) {
+        const user = await getUserById(userId);
+        isVipUser = user ? await isVip(user) : false;
+      }
       res.json({
         limit: USAGE_LIMIT_PER_DAY,
         used,
         remaining: Math.max(0, USAGE_LIMIT_PER_DAY - used),
         date: new Date().toISOString().slice(0, 10),
+        isVip: isVipUser,
       });
     } catch (err: any) {
       console.error("Error reading usage:", err);
@@ -1234,6 +1519,203 @@ async function startServer() {
     }
   });
 
+  // API: Đăng ký tài khoản học sinh
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      const password = String(req.body?.password || "");
+      const name = String(req.body?.name || "").trim().slice(0, 60);
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "Email không hợp lệ." });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Mật khẩu phải có ít nhất 6 ký tự." });
+      }
+      if (await getUserByEmail(email)) {
+        return res.status(409).json({ error: "Email này đã được đăng ký." });
+      }
+
+      const user: UserRecord = {
+        id: "u-" + crypto.randomBytes(12).toString("hex"),
+        email,
+        name,
+        passwordHash: hashPassword(password),
+        vipUntil: null,
+        createdAt: new Date().toISOString(),
+      };
+      await upsertUser(user);
+
+      const token = crypto.randomBytes(32).toString("hex");
+      userTokens.set(token, user.id);
+      res.status(201).json({
+        token,
+        user: publicUser(user, false),
+        message: "Đăng ký thành công!",
+      });
+    } catch (err: any) {
+      console.error("Register error:", err);
+      res.status(500).json({ error: "Không đăng ký được. Vui lòng thử lại." });
+    }
+  });
+
+  // API: Đăng nhập học sinh
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      const password = String(req.body?.password || "");
+      const user = await getUserByEmail(email);
+      if (!user || !verifyPassword(password, user.passwordHash)) {
+        return res.status(401).json({ error: "Sai email hoặc mật khẩu." });
+      }
+      const vip = await isVip(user);
+      const token = crypto.randomBytes(32).toString("hex");
+      userTokens.set(token, user.id);
+      res.json({
+        token,
+        user: publicUser(user, vip),
+        message: "Đăng nhập thành công!",
+      });
+    } catch (err: any) {
+      console.error("Login error:", err);
+      res.status(500).json({ error: "Không đăng nhập được. Vui lòng thử lại." });
+    }
+  });
+
+  // API: Đăng xuất học sinh
+  app.post("/api/auth/logout", requireUser, (req, res) => {
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    userTokens.delete(token);
+    res.json({ ok: true });
+  });
+
+  // API: Thông tin tài khoản hiện tại (gọi khi vào web để biết VIP hay không)
+  app.get("/api/auth/me", requireUser, async (req, res) => {
+    try {
+      const user = await getUserById((req as any).userId);
+      if (!user) return res.status(401).json({ error: "Không tìm thấy tài khoản." });
+      res.json({ user: publicUser(user, await isVip(user)) });
+    } catch (err: any) {
+      console.error("Me error:", err);
+      res.status(500).json({ error: "Không đọc được tài khoản." });
+    }
+  });
+
+  // API: Nhập mã kích hoạt VIP (cộng dồn số ngày cho tài khoản)
+  app.post("/api/vip/redeem", requireUser, async (req, res) => {
+    try {
+      const rawCode = String(req.body?.code || "").trim().toUpperCase();
+      if (!rawCode) {
+        return res.status(400).json({ error: "Vui lòng nhập mã kích hoạt." });
+      }
+      const keys = await readLicenseKeys();
+      const key = keys.find((k) => k.code.toUpperCase() === rawCode);
+      if (!key) {
+        return res.status(404).json({ error: "Mã kích hoạt không tồn tại." });
+      }
+      if (key.status === "used") {
+        return res.status(409).json({ error: "Mã này đã được sử dụng." });
+      }
+      if (key.status === "void") {
+        return res.status(409).json({ error: "Mã này đã bị vô hiệu hóa." });
+      }
+
+      const user = await getUserById((req as any).userId);
+      if (!user) return res.status(401).json({ error: "Không tìm thấy tài khoản." });
+
+      const base = user.vipUntil && new Date(user.vipUntil).getTime() > Date.now()
+        ? new Date(user.vipUntil)
+        : new Date();
+      base.setDate(base.getDate() + key.days);
+
+      user.vipUntil = base.toISOString();
+      key.status = "used";
+      key.usedByEmail = user.email;
+      key.usedAt = new Date().toISOString();
+      await upsertUser(user);
+      await writeLicenseKeys(keys);
+
+      const vip = await isVip(user);
+      res.json({
+        ok: true,
+        user: publicUser(user, vip),
+        message: `Đã kích hoạt ${PLAN_LABELS[key.plan]} VIP (${key.days} ngày) cho tài khoản ${user.email}!`,
+        vipUntil: user.vipUntil,
+      });
+    } catch (err: any) {
+      console.error("Redeem error:", err);
+      res.status(500).json({ error: "Không kích hoạt được mã. Vui lòng thử lại." });
+    }
+  });
+
+  // API: Sinh mã kích hoạt VIP (admin)
+  app.post("/api/vip/keys", requireAdmin, async (req, res) => {
+    try {
+      const plan = String(req.body?.plan || "1m") as keyof typeof PLAN_DURATIONS;
+      const count = Math.min(200, Math.max(1, Number(req.body?.count) || 1));
+      const note = String(req.body?.note || "").slice(0, 200);
+      if (!(plan in PLAN_DURATIONS)) {
+        return res.status(400).json({ error: "Loại gói không hợp lệ." });
+      }
+      const prefix = plan === "1m" ? "VIP1" : plan === "3m" ? "VIP3" : "VIP12";
+      const codes = generateLicenseCodes(count, prefix);
+      const now = new Date().toISOString();
+      const newKeys: LicenseKeyRecord[] = codes.map((code) => ({
+        code,
+        plan,
+        days: PLAN_DURATIONS[plan],
+        status: "unused",
+        note,
+        usedByEmail: null,
+        usedAt: null,
+        createdAt: now,
+      }));
+      const existing = await readLicenseKeys();
+      await writeLicenseKeys([...newKeys, ...existing]);
+      res.status(201).json({
+        ok: true,
+        message: `Đã sinh ${count} mã ${PLAN_LABELS[plan]} (${PLAN_DURATIONS[plan]} ngày).`,
+        keys: newKeys,
+      });
+    } catch (err: any) {
+      console.error("Generate keys error:", err);
+      res.status(500).json({ error: "Không sinh được mã kích hoạt." });
+    }
+  });
+
+  // API: Danh sách mã kích hoạt (admin)
+  app.get("/api/vip/keys", requireAdmin, async (_req, res) => {
+    try {
+      const keys = await readLicenseKeys();
+      res.json({ keys, total: keys.length });
+    } catch (err: any) {
+      console.error("List keys error:", err);
+      res.status(500).json({ error: "Không tải được danh sách mã." });
+    }
+  });
+
+  // API: Vô hiệu hóa / kích hoạt lại một mã (admin)
+  app.post("/api/vip/keys/:code/void", requireAdmin, async (req, res) => {
+    try {
+      const code = String(req.params.code || "").toUpperCase();
+      const keys = await readLicenseKeys();
+      const key = keys.find((k) => k.code.toUpperCase() === code);
+      if (!key) {
+        return res.status(404).json({ error: "Không tìm thấy mã." });
+      }
+      if (key.status === "used") {
+        return res.status(409).json({ error: "Mã đã được sử dụng, không thể vô hiệu hóa." });
+      }
+      key.status = key.status === "void" ? "unused" : "void";
+      await writeLicenseKeys(keys);
+      res.json({ ok: true, keys, message: key.status === "void" ? "Đã vô hiệu hóa mã." : "Đã kích hoạt lại mã." });
+    } catch (err: any) {
+      console.error("Void key error:", err);
+      res.status(500).json({ error: "Không cập nhật được mã." });
+    }
+  });
+
   // API: Soạn bài ghi Lớp 12 (Bám sát nguồn & phong cách Lời Giải Hay - loigiaihay.com)
   app.post("/api/lesson-note", async (req, res) => {
     try {
@@ -1262,15 +1744,8 @@ async function startServer() {
         return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
 
-      // Giới hạn lượt soạn bài miễn phí: 3 lượt/ngày theo IP
-      const usageKeyForReq = usageKey(req);
-      const used = await readUsageCount(usageKeyForReq);
-      if (used >= USAGE_LIMIT_PER_DAY) {
-        return res.status(429).json({
-          error: `Bạn đã dùng hết ${USAGE_LIMIT_PER_DAY} lượt soạn bài miễn phí hôm nay. Hạn mức sẽ tự reset vào ngày mai.`,
-          usage: { limit: USAGE_LIMIT_PER_DAY, used, remaining: 0 },
-        });
-      }
+      // Giới hạn lượt AI miễn phí (VIP không giới hạn)
+      if (!(await checkAiUsageLimit(req, res))) return;
 
       const ai = getGeminiClient();
 
@@ -1372,7 +1847,7 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
       });
 
       const content = response.text || "Không tạo được nội dung bài học. Vui lòng thử lại.";
-      await incrementUsage(usageKeyForReq);
+      await incrementUsage(usageKey(req));
       await bumpStat("lesson_note", req).catch(() => {});
 
       // Tự động đề xuất bài mẫu chờ admin duyệt (không làm hỏng response nếu lỗi)
@@ -1437,6 +1912,9 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
       if (maintenanceMsg) {
         return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
       }
+
+      // Giới hạn lượt AI miễn phí (VIP không giới hạn)
+      if (!(await checkAiUsageLimit(req, res))) return;
 
       const ai = getGeminiClient();
 
@@ -1521,6 +1999,7 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
       });
 
       const solution = response.text || "Không thể giải bài tập này. Vui lòng kiểm tra lại ảnh hoặc đề bài.";
+      await incrementUsage(usageKey(req));
       await bumpStat("solve_exercise", req).catch(() => {});
       res.json({ result: solution });
     } catch (err: any) {
@@ -1542,6 +2021,9 @@ Mọi lời giải bài tập (SGK, SBT, đề kiểm tra, đề thi thử THPT)
       }
 
       const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
+
+      // Giới hạn lượt AI miễn phí (VIP không giới hạn)
+      if (!(await checkAiUsageLimit(req, res))) return;
 
       const ai = getGeminiClient();
 
@@ -1567,6 +2049,7 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
       });
 
       await bumpStat("tutor_followup", req).catch(() => {});
+      await incrementUsage(usageKey(req));
       res.json({ result: response.text || "Xin lỗi, hiện chưa thể trả lời câu hỏi này." });
     } catch (err: any) {
       console.error("Error in tutor followup:", err);
@@ -1577,9 +2060,20 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
     }
   });
 
-  // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng)
-  app.get("/api/community/presets", async (_req, res) => {
+  // API: Danh sách bài mẫu chia sẻ (đồng bộ mọi người dùng) — chỉ dành cho VIP
+  app.get("/api/community/presets", async (req, res) => {
     try {
+      const auth = (req.headers.authorization || "").startsWith("Bearer ")
+        ? (req.headers.authorization || "").slice(7)
+        : "";
+      const userId = auth ? userTokens.get(auth) : undefined;
+      const user = userId ? await getUserById(userId) : null;
+      if (!user || !(await isVip(user))) {
+        return res.status(403).json({
+          error: "Kho bài mẫu dành cho tài khoản VIP. Nâng cấp để mở khóa.",
+          vipRequired: true,
+        });
+      }
       const items = await loadAllPresets();
       res.json({
         items,

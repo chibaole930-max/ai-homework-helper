@@ -18,6 +18,11 @@ import {
   HeartHandshake,
   ImagePlus,
   CheckCheck,
+  Crown,
+  Ticket,
+  KeyRound,
+  Copy,
+  ShieldBan,
 } from 'lucide-react';
 
 interface SiteSettings {
@@ -85,6 +90,90 @@ export default function AdminTab() {
   const [stats, setStats] = useState<StatsOverview | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  const [vipKeys, setVipKeys] = useState<
+    { code: string; plan: string; days: number; status: string; note: string; usedByEmail: string | null; usedAt: string | null; createdAt: string }[] | null
+  >(null);
+  const [vipKeysLoading, setVipKeysLoading] = useState(false);
+  const [genPlan, setGenPlan] = useState<'1m' | '3m' | '1y'>('1m');
+  const [genCount, setGenCount] = useState(1);
+  const [genNote, setGenNote] = useState('');
+  const [genBusy, setGenBusy] = useState(false);
+  const [genMsg, setGenMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [vipFilter, setVipFilter] = useState<'all' | 'unused' | 'used' | 'void'>('all');
+
+  const fetchVipKeys = async () => {
+    if (!token) return;
+    setVipKeysLoading(true);
+    try {
+      const res = await fetch('/api/vip/keys', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        setToken('');
+        return;
+      }
+      if (!res.ok) throw new Error('Không tải được mã VIP.');
+      const d = await res.json();
+      setVipKeys(d.keys || []);
+    } catch (err: any) {
+      setGenMsg({ ok: false, text: err.message || 'Không tải được mã VIP.' });
+    } finally {
+      setVipKeysLoading(false);
+    }
+  };
+
+  const handleGenerateKeys = async () => {
+    setGenBusy(true);
+    setGenMsg(null);
+    try {
+      const res = await fetch('/api/vip/keys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plan: genPlan, count: genCount, note: genNote.trim() }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Không sinh được mã VIP.');
+      setGenMsg({ ok: true, text: d.message || 'Đã sinh mã.' });
+      await fetchVipKeys();
+    } catch (err: any) {
+      setGenMsg({ ok: false, text: err.message || 'Không sinh được mã.' });
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
+  const handleToggleVoidKey = async (code: string) => {
+    setGenBusy(true);
+    setGenMsg(null);
+    try {
+      const res = await fetch(`/api/vip/keys/${encodeURIComponent(code)}/void`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Không cập nhật được.');
+      setGenMsg({ ok: true, text: d.message || 'Đã cập nhật.' });
+      await fetchVipKeys();
+    } catch (err: any) {
+      setGenMsg({ ok: false, text: err.message || 'Không cập nhật được.' });
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setGenMsg({ ok: true, text: `Đã sao chép: ${code}` });
+    } catch {
+      setGenMsg({ ok: false, text: 'Không sao chép được (cần quyền clipboard).' });
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
@@ -129,7 +218,13 @@ export default function AdminTab() {
       .then((d) => setStats(d as StatsOverview))
       .catch(() => {})
       .finally(() => setStatsLoading(false));
+    fetchVipKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const refreshVipKeys = () => {
+    fetchVipKeys();
+  };
 
   const refreshStats = () => {
     if (!token) return;
@@ -855,6 +950,222 @@ export default function AdminTab() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quản lý mã kích hoạt VIP */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 text-amber-600">
+              <Crown className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800">Quản Lý Mã Kích Hoạt VIP</h2>
+              <p className="text-[11px] text-slate-500">
+                Sinh mã bán qua Momo/chuyển khoản. Học sinh nhập mã để mở khóa AI không giới hạn + Kho bài mẫu.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={refreshVipKeys}
+            disabled={vipKeysLoading}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50 shrink-0"
+          >
+            {vipKeysLoading ? 'Đang tải...' : 'Làm mới danh sách'}
+          </button>
+        </div>
+
+        {/* Sinh mã */}
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+          <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-800">
+            <KeyRound className="w-3.5 h-3.5" />
+            Sinh mã mới
+          </div>
+          <div className="grid sm:grid-cols-4 gap-2.5 items-end">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 block mb-1">Gói</label>
+              <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-white">
+                {(['1m', '3m', '1y'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setGenPlan(p)}
+                    className={`flex-1 px-2 py-2 text-[11px] font-bold transition-colors ${
+                      genPlan === p ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-amber-50'
+                    }`}
+                  >
+                    {p === '1m' ? '1 Tháng' : p === '3m' ? '3 Tháng' : '1 Năm'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 block mb-1">Số lượng</label>
+              <div className="flex items-center rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <button
+                  onClick={() => setGenCount((c) => Math.max(1, c - 1))}
+                  className="px-2.5 py-2 text-slate-500 hover:bg-slate-50 font-bold"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={genCount}
+                  onChange={(e) => setGenCount(Number(e.target.value) || 1)}
+                  className="w-full text-center text-sm font-bold outline-none"
+                />
+                <button
+                  onClick={() => setGenCount((c) => Math.min(200, c + 1))}
+                  className="px-2.5 py-2 text-slate-500 hover:bg-slate-50 font-bold"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="sm:col-span-1">
+              <label className="text-[10px] font-bold text-slate-500 block mb-1">Ghi chú</label>
+              <input
+                value={genNote}
+                onChange={(e) => setGenNote(e.target.value)}
+                placeholder="VD: bán qua Zalo 098..."
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none"
+              />
+            </div>
+            <div className="flex gap-2 sm:justify-end">
+              <button
+                onClick={handleGenerateKeys}
+                disabled={genBusy}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white"
+              >
+                {genBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ticket className="w-3.5 h-3.5" />}
+                Sinh mã
+              </button>
+            </div>
+          </div>
+          {genMsg && (
+            <div
+              className={`px-3 py-2 rounded-xl text-xs flex items-center gap-2 ${
+                genMsg.ok
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}
+            >
+              {genMsg.ok ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+              {genMsg.text}
+            </div>
+          )}
+        </div>
+
+        {/* Bộ lọc */}
+        <div className="flex flex-wrap gap-1.5">
+          {(['all', 'unused', 'used', 'void'] as const).map((f) => {
+            const count =
+              !vipKeys
+                ? 0
+                : f === 'all'
+                  ? vipKeys.length
+                  : vipKeys.filter((k) => k.status === f).length;
+            return (
+              <button
+                key={f}
+                onClick={() => setVipFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                  vipFilter === f
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {f === 'all' ? 'Tất cả' : f === 'unused' ? 'Chưa dùng' : f === 'used' ? 'Đã dùng' : 'Vô hiệu'}{' '}
+                <span className="opacity-70">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Danh sách mã */}
+        {vipKeysLoading && !vipKeys ? (
+          <div className="py-6 flex justify-center text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        ) : !vipKeys || vipKeys.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400">
+            Chưa có mã nào. Sinh mã bên trên để bắt đầu.
+          </div>
+        ) : (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-[11px]">
+              <thead className="sticky top-0 bg-white">
+                <tr className="text-slate-400 border-b border-slate-200">
+                  <th className="text-left py-1.5 font-bold">Mã</th>
+                  <th className="text-left py-1.5 font-bold">Gói</th>
+                  <th className="text-left py-1.5 font-bold">Trạng thái</th>
+                  <th className="text-left py-1.5 font-bold">Người dùng</th>
+                  <th className="text-left py-1.5 font-bold">Ghi chú</th>
+                  <th className="text-right py-1.5 font-bold">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vipKeys
+                  .filter((k) => vipFilter === 'all' || k.status === vipFilter)
+                  .map((k) => (
+                    <tr key={k.code} className="border-b border-slate-100">
+                      <td className="py-2 pr-2">
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-bold text-slate-700 whitespace-nowrap">{k.code}</span>
+                          <button
+                            onClick={() => copyCode(k.code)}
+                            title="Sao chép"
+                            className="text-slate-400 hover:text-amber-600 transition-colors"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-2 pr-2 whitespace-nowrap">
+                        <span className="text-amber-700 font-bold">
+                          {k.plan === '1m' ? '1 Tháng' : k.plan === '3m' ? '3 Tháng' : '1 Năm'}
+                        </span>{' '}
+                        <span className="text-slate-400">{k.days} ngày</span>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
+                            k.status === 'unused'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : k.status === 'used'
+                                ? 'bg-violet-100 text-violet-700'
+                                : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {k.status === 'unused' ? 'Chưa dùng' : k.status === 'used' ? `Đã dùng ${k.usedAt ? new Date(k.usedAt).toLocaleDateString('vi-VN') : ''}` : 'Vô hiệu'}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-2 text-slate-600 max-w-[140px] truncate">
+                        {k.usedByEmail || '—'}
+                      </td>
+                      <td className="py-2 pr-2 text-slate-500 max-w-[140px] truncate">{k.note || '—'}</td>
+                      <td className="py-2 text-right">
+                        {k.status === 'used' ? (
+                          <span className="text-[10px] text-slate-300">Không thể xử lý</span>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleVoidKey(k.code)}
+                            className="px-2 py-1 text-[10px] font-bold rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors"
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              <ShieldBan className="w-3 h-3" />
+                              {k.status === 'void' ? 'Khôi phục' : 'Vô hiệu'}
+                            </span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

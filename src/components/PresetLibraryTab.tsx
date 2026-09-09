@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PRESET_LESSON_NOTES } from '../data/presets';
 import { SavedStudyItem, SubjectId, SubjectInfo, GradeId } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useAuth } from '../context/AuthContext';
+import { authHeaders } from '../lib/auth';
 import {
   Library,
   BookOpen,
@@ -18,6 +20,9 @@ import {
   Users,
   Send,
   Loader2,
+  Crown,
+  Lock,
+  LogIn,
 } from 'lucide-react';
 
 interface CommunityPreset extends SavedStudyItem {
@@ -59,10 +64,13 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     content: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const { user, loading: authLoading, openVip, openAuth } = useAuth();
+  const isVip = user?.isVip ?? false;
 
   const refreshPresets = useCallback(async () => {
     try {
-      const res = await fetch('/api/community/presets');
+      const res = await fetch('/api/community/presets', { headers: authHeaders() });
+      if (res.status === 403) return;
       if (!res.ok) throw new Error('API lỗi');
       const data = await res.json();
       if (data && Array.isArray(data.items) && data.items.length > 0) {
@@ -77,8 +85,65 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
   }, []);
 
   useEffect(() => {
-    refreshPresets();
-  }, [refreshPresets]);
+    if (isVip) refreshPresets();
+    else setLoading(false);
+  }, [refreshPresets, isVip]);
+
+  if (!authLoading && !isVip) {
+    return (
+      <div className="animate-announce-in">
+        <div className="rounded-3xl bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 p-6 sm:p-8 text-white relative overflow-hidden shadow-lg">
+          <div className="absolute -right-16 -top-16 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="relative space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 ring-1 ring-white/30 flex items-center justify-center">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold flex items-center gap-2">
+                Kho Bài Mẫu dành riêng cho <Crown className="w-5 h-5 text-yellow-300" /> VIP
+              </h2>
+              <p className="text-sm text-orange-100 mt-1 leading-relaxed">
+                Hàng trăm bài ghi + bài giải chi tiết do cộng đồng đóng góp, liên tục cập nhật.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-2.5">
+              {[
+                'AI không giới hạn',
+                'Xem & lưu mọi bài mẫu',
+                'Chỉ từ 49.000đ / tháng',
+              ].map((b) => (
+                <div
+                  key={b}
+                  className="flex items-center gap-2 bg-white/10 ring-1 ring-white/20 rounded-xl px-3 py-2 text-xs font-bold"
+                >
+                  <Crown className="w-3.5 h-3.5 text-yellow-300 flex-shrink-0" />
+                  {b}
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              <button
+                onClick={openVip}
+                className="inline-flex items-center gap-1.5 rounded-2xl bg-white text-amber-700 font-extrabold text-sm px-5 py-2.5 shadow-md hover:opacity-90 transition-opacity"
+              >
+                <Crown className="w-4 h-4" />
+                Nâng cấp VIP ngay
+              </button>
+              {!user && (
+                <button
+                  onClick={openAuth}
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-white/15 ring-1 ring-white/30 text-white font-bold text-sm px-5 py-2.5 hover:bg-white/25 transition-colors"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Đăng nhập để nhập mã
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const filteredPresets = items.filter((item) => {
     if (selectedSubject !== 'all' && item.subjectId !== selectedSubject) {
