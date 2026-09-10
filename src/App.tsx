@@ -20,7 +20,6 @@ import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench, Hea
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
-const DONATE_SESSION_KEY = 'donate_shown_session_v1';
 
 interface SiteStatus {
   maintenance: {
@@ -145,8 +144,6 @@ function AppContent() {
 
   const openDonateOnce = () => {
     if (!donateEnabled) return;
-    if (sessionStorage.getItem(DONATE_SESSION_KEY) === '1') return;
-    sessionStorage.setItem(DONATE_SESSION_KEY, '1');
     setDonateVisible(true);
   };
 
@@ -427,7 +424,7 @@ function AppContent() {
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-announce-backdrop"
             onClick={() => setDonateVisible(false)}
           />
-          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-announce-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-announce-in">
             <div className="bg-gradient-to-br from-rose-500 via-pink-500 to-rose-400 px-5 pt-5 pb-14 relative">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 text-white ring-1 ring-white/30">
                 <HeartHandshake className="w-6 h-6" />
@@ -444,7 +441,7 @@ function AppContent() {
               <img
                 src={siteStatus.donate.qrImage}
                 alt="Mã QR ủng hộ"
-                className="w-56 h-56 object-contain rounded-2xl border border-slate-200 bg-white p-2"
+                className="w-72 h-72 sm:w-80 sm:h-80 object-contain rounded-2xl border border-slate-200 bg-white p-2.5"
               />
               {siteStatus.donate.note && (
                 <p className="mt-4 text-sm text-slate-700 leading-relaxed text-center whitespace-pre-wrap">
