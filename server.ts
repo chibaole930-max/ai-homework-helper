@@ -1421,7 +1421,12 @@ async function checkAiUsageLimit(
   req: express.Request,
   res: express.Response
 ): Promise<boolean> {
-  const userId = (req as any).userId;
+  // Nhận diện người dùng đã đăng nhập (Bearer token) kể cả khi route không qua middleware:
+  // VIP dùng AI không giới hạn lượt.
+  const auth = (req.headers.authorization || "").startsWith("Bearer ")
+    ? (req.headers.authorization || "").slice(7)
+    : "";
+  const userId = (req as any).userId || (auth ? userTokens.get(auth) : undefined);
   if (userId) {
     const user = await getUserById(userId);
     if (user && (await isVip(user))) return true;
@@ -1873,7 +1878,7 @@ async function startServer() {
       res.json({
         limit: USAGE_LIMIT_PER_DAY,
         used,
-        remaining: Math.max(0, USAGE_LIMIT_PER_DAY - used),
+        remaining: isVipUser ? 999999 : Math.max(0, USAGE_LIMIT_PER_DAY - used),
         date: new Date().toISOString().slice(0, 10),
         isVip: isVipUser,
       });

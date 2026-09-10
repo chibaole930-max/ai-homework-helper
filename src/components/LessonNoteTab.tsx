@@ -276,7 +276,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   };
 
   const alreadySaved = isItemSaved(lessonTitle.trim(), currentSubject.name);
-  const outOfUses = usage !== null && usage.remaining <= 0;
+  const outOfUses = usage !== null && !usage.isVip && usage.remaining <= 0;
 
   return (
     <div className="space-y-6">
