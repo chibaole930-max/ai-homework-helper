@@ -6,8 +6,6 @@ services:
     buildCommand: bun install && bun run build
     startCommand: bun run start
     envVars:
-      - key: GEMINI_API_KEY
-        sync: false
       - key: DATABASE_URL
         sync: false
       - key: ADMIN_PASSWORD

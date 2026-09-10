@@ -985,10 +985,10 @@ export default function AdminTab() {
 
         {aiKeyRows.length === 0 ? (
           <div className="px-3 py-5 rounded-xl bg-slate-50 text-xs text-slate-500 text-center leading-relaxed">
-            Chưa có key nào. Bấm <b className="text-indigo-600">Thêm key</b> để quản lý nhiều key.
+            Chưa có key nào. Bấm <b className="text-indigo-600">Thêm key</b> để thêm API key đầu tiên.
             <br />
-            Để trống danh sách thì server dùng key môi trường{' '}
-            <code className="font-mono text-indigo-600">GEMINI_API_KEY</code> trên Render.
+            Key được quản lý <b>hoàn toàn trên web</b>, không cần biến môi trường {' '}
+            <code className="font-mono text-indigo-600">GEMINI_API_KEY</code>.
           </div>
         ) : (
           <div className="space-y-3">
@@ -1246,8 +1246,9 @@ export default function AdminTab() {
               key rỗng/trùng sẽ bị server tự bỏ, key tắt (✓) tạm ngưng dùng.
             </p>
             <p>
-              Xoá hết danh sách rồi lưu để <b className="text-slate-600">chỉ dùng key môi trường</b>{' '}
-              <code className="font-mono text-indigo-600">GEMINI_API_KEY</code>.
+              Key được quản lý <b className="text-slate-600">hoàn toàn trên web</b>, không cần đặt
+              biến môi trường <code className="font-mono text-indigo-600">GEMINI_API_KEY</code>.
+              Nếu xoá hết key thì AI sẽ báo chưa cấu hình cho tới khi bạn thêm key mới.
             </p>
           </div>
         </div>

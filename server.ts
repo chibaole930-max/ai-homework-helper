@@ -549,8 +549,6 @@ function getSiteGeminiApiKeys(): string[] {
   for (const part of parseGeminiKeyList(cfg.geminiKey)) {
     if (!keys.includes(part)) keys.push(part);
   }
-  const envKey = (process.env.GEMINI_API_KEY || "").trim();
-  if (envKey && !keys.includes(envKey)) keys.push(envKey);
   return keys;
 }
 
@@ -624,10 +622,6 @@ function getAiKeyBudgetInfos(): { key: string; name?: string; limit: number }[] 
     seen.add(key);
     infos.push({ key, name: k.name, limit: budgetFor(k.limit) });
   }
-  const envKey = (process.env.GEMINI_API_KEY || "").trim();
-  if (envKey && !seen.has(envKey)) {
-    infos.push({ key: envKey, name: "Môi trường (GEMINI_API_KEY)", limit: DEFAULT_AI_KEY_DAILY_LIMIT });
-  }
   return infos;
 }
 
@@ -649,7 +643,7 @@ type GeminiClientEntry = { client: GoogleGenAI; key: string };
 function getGeminiClients(): GeminiClientEntry[] {
   const keys = getSiteGeminiApiKeys();
   if (keys.length === 0) {
-    throw new Error("GEMINI_API_KEY is not set in the environment.");
+    throw new Error("Chưa cấu hình Gemini API key trên web. Vào Quản trị để thêm key.");
   }
   const rotated = [
     ...keys.slice(geminiRotationIndex),

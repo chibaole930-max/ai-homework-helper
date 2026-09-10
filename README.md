@@ -15,6 +15,11 @@ View your app in AI Studio: https://ai.studio/apps/1ca857fc-fcad-494f-a20c-8bc89
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Run the app:
    `npm run dev`
+
+## Gemini API key
+
+API keys cho Gemini được quản lý **hoàn toàn trên web** — vào `#/admin` rồi thêm key tại mục
+"Ai Manager". Không cần đặt biến môi trường `GEMINI_API_KEY`. Nếu chạy local chưa vào web để
+bổ sung key, bạn có thể ghi file `data/site-settings.json` hoặc để trống và thêm qua Admin sau.
