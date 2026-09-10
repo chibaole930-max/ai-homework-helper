@@ -2,7 +2,7 @@ import { SubjectId, CurriculumChapter } from '../types';
 
 const LOIGIAIHAY_BASE = 'https://loigiaihay.com';
 
-export const SUBJECT_CURRICULUM_11: Record<SubjectId, CurriculumChapter[]> = {
+export const SUBJECT_CURRICULUM_11: Partial<Record<SubjectId, CurriculumChapter[]>> = {
   toan: [
     {
       id: 'toan-ch0',

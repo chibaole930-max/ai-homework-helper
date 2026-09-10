@@ -2507,6 +2507,10 @@ async function startServer() {
       } = req.body;
 
       const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
+      const examFocus =
+        String(grade) === "9"
+          ? "thi tuyển sinh vào lớp 10 (cấp Trung học cơ sở)"
+          : "thi Tốt nghiệp THPT & Đánh giá năng lực";
 
       if (!subject || !lessonTitle) {
         return res.status(400).json({ error: "Thiếu thông tin môn học hoặc tên bài học." });
@@ -2523,7 +2527,7 @@ async function startServer() {
 
       const aiClients = getGeminiClients();
 
-      const systemInstruction = `Bạn là chuyên gia sư phạm THPT hàng đầu Việt Nam, bám sát hệ thống học liệu và phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com) dành cho học sinh ${gradeLabel} theo Chương trình Giáo dục Phổ thông mới (GDPT 2018 - bộ sách Kết nối tri thức với cuộc sống, Cánh diều, Chân trời sáng tạo) và định hướng thi Tốt nghiệp THPT & Đánh giá năng lực.
+      const systemInstruction = `Bạn là chuyên gia sư phạm hàng đầu Việt Nam, bám sát hệ thống học liệu và phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com) dành cho học sinh ${gradeLabel} theo Chương trình Giáo dục Phổ thông mới (GDPT 2018 - bộ sách Kết nối tri thức với cuộc sống, Cánh diều, Chân trời sáng tạo) và định hướng ${examFocus}.
 Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
 - Bám sát chặt chẽ sách giáo khoa (SGK) và sách bài tập (SBT) của từng bộ sách.
 - Trình bày bài học rõ ràng, sư phạm, chuẩn mực. Mỗi mục câu hỏi luôn có cấu trúc:
@@ -2531,7 +2535,7 @@ Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
   + "Phương pháp giải" (Chỉ rõ định lý, tính chất, công thức áp dụng và hướng tư duy)
   + "Lời giải chi tiết" (Từng bước suy luận chặt chẽ, mạch lạc, chính xác tuyệt đối, dễ hiểu cho mọi đối tượng học sinh)
   + "Đáp số / Kết luận" (Ngắn gọn, chuẩn xác)
-- Luôn có hộp mẹo nhớ, lời khuyên và cảnh báo bẫy sai lầm hay gặp trong bài kiểm tra và đề thi THPT Quốc gia.
+- Luôn có hộp mẹo nhớ, lời khuyên và cảnh báo bẫy sai lầm hay gặp trong bài kiểm tra và đề ${examFocus}.
 - QUY TẮC ĐỊNH DẠNG KÝ HIỆU ĐỘ, ĐƠN VỊ & TOÁN HỌC (RẤT QUAN TRỌNG):
   + Đối với Địa lí, Lịch sử, Văn học, GD-KTPL: Viết toàn bộ văn bản, phân tích và số liệu bằng tiếng Việt tự nhiên thông thường.
   + TUYỆT ĐỐI KHÔNG dùng dấu $...$ hay lệnh LaTeX \\text{...} cho câu văn hoặc từ ngữ tiếng Việt.

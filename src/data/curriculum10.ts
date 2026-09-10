@@ -2,7 +2,7 @@
 
 const LOIGIAIHAY_BASE = 'https://loigiaihay.com';
 
-export const SUBJECT_CURRICULUM_10: Record<SubjectId, CurriculumChapter[]> = {
+export const SUBJECT_CURRICULUM_10: Partial<Record<SubjectId, CurriculumChapter[]>> = {
   toan: [
     {
       id: 'toan-ch0',

@@ -1,6 +1,6 @@
 import { SubjectId, CurriculumChapter } from '../types';
 
-export const SUBJECT_CURRICULUM: Record<SubjectId, CurriculumChapter[]> = {
+export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>> = {
   dia: [
     {
       id: 'dia-phan-1',

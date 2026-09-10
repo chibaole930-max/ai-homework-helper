@@ -85,7 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Grade Switcher */}
           <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 self-start lg:self-auto">
-            {(['10', '11', '12'] as GradeId[]).map((g) => (
+            {(['9', '10', '11', '12'] as GradeId[]).map((g) => (
               <button
                 key={g}
                 onClick={() => onGradeChange(g)}

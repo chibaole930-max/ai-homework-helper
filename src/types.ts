@@ -9,9 +9,11 @@ export type SubjectId =
   | 'dia'
   | 'gdktpl'
   | 'tin'
-  | 'congnghe';
+  | 'congnghe'
+  | 'khtn'
+  | 'sudia';
 
-export type GradeId = '10' | '11' | '12';
+export type GradeId = '9' | '10' | '11' | '12';
 
 export type TextbookSeries =
   | 'Kết nối tri thức với cuộc sống'

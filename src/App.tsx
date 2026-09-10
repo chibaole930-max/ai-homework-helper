@@ -65,7 +65,7 @@ function AppContent() {
 
   useEffect(() => {
     const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
-    if (savedGrade === '10' || savedGrade === '11' || savedGrade === '12') {
+    if (savedGrade === '9' || savedGrade === '10' || savedGrade === '11' || savedGrade === '12') {
       setGrade(savedGrade);
     }
   }, []);

@@ -255,6 +255,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
           {(
             [
               ['all', 'Tất cả lớp'],
+              ['9', 'Lớp 9'],
               ['10', 'Lớp 10'],
               ['11', 'Lớp 11'],
               ['12', 'Lớp 12'],
