@@ -141,6 +141,7 @@ export default function AdminTab() {
       limit: number;
       usedToday: number;
       remaining: number;
+      models: { model: string; cap: number; usedToday: number; remaining: number }[];
       requests: number;
       successes: number;
       failures: number;
@@ -1013,8 +1014,8 @@ export default function AdminTab() {
                         limit: e.target.value === '' ? undefined : Math.max(1, Number(e.target.value)),
                       })
                     }
-                    placeholder="400"
-                    title={`Giới hạn lượt/ngày (bỏ trống = 400)`}
+                    placeholder="1140"
+                    title={`Giới hạn tổng lượt/ngày (bỏ trống = tự tính theo trần thật của các model: 1140)`}
                     className="w-16 shrink-0 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-center focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
                   />
                   <label className="flex items-center gap-1.5 cursor-pointer shrink-0 text-[11px] font-bold text-slate-600">
@@ -1131,7 +1132,7 @@ export default function AdminTab() {
               <HeartPulse className="w-3.5 h-3.5 text-emerald-500" />
               Sức khỏe key & dự tính tiết kiệm
               <span className="font-normal text-slate-400">
-                (reset sau ≈{' '}
+                (reset theo giờ Mỹ sau ≈{' '}
                 {(() => {
                   const ms = aiHealth.summary.resetInMs;
                   const h = Math.floor(ms / 3600000);
@@ -1180,6 +1181,28 @@ export default function AdminTab() {
                           style={{ width: `${Math.max(2, pct)}%` }}
                         />
                       </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {k.models.map((m) => {
+                          const cpct =
+                            m.cap > 0 ? Math.min(100, Math.round((m.usedToday / m.cap) * 100)) : 0;
+                          const cColor =
+                            m.remaining === 0
+                              ? 'bg-rose-100 text-rose-600'
+                              : cpct >= 70
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-emerald-100 text-emerald-700';
+                          const short = m.model.replace('gemini-', '').replace('-flash', '');
+                          return (
+                            <span
+                              key={m.model}
+                              title={`${m.model}: đã dùng ${m.usedToday}/${m.cap} lượt hôm nay (giới hạn thật theo AI Studio)`}
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${cColor}`}
+                            >
+                              {short}: {m.remaining}/{m.cap}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
@@ -1224,7 +1247,7 @@ export default function AdminTab() {
                     Nên có ~<b>{aiHealth.summary.neededKeys}</b> key (đang có{' '}
                     <b>{aiHealth.summary.activeCount}</b>). Bổ sung ≈
                     <b>{aiHealth.summary.extraKeys}</b> key nữa để tránh gián đoạn. Khi để trống
-                    giới hạn, mỗi key mặc định <b>400 lượt/ngày</b>.
+                    giới hạn, mỗi key mặc định dùng theo trần thật của từng model (flash 20, flash-lite 500/ngày — gộp ≈ <b>1140 lượt/ngày</b>).
                   </span>
                 )}
                 {aiHealth.summary.status === 'exhausted' && (

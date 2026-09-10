@@ -566,7 +566,32 @@ function maskGeminiKey(key: string): string {
 // ---------------------------------------------------------------------------
 // NGÂN SÁCH/ĐẾM LƯỢT THEO NGÀY CHO TỪNG KEY (persist qua file)
 // ---------------------------------------------------------------------------
-const DEFAULT_AI_KEY_DAILY_LIMIT = 400;
+interface ModelQuota {
+  rpd: number; // Requests Per Day
+  rpm: number; // Requests Per Minute
+  tpm: number; // Tokens Per Minute
+}
+
+// Giới hạn THẬT của từng model-tier lấy từ bảng quota free AI Studio (mỗi key tính riêng):
+// - Các model "flash" (3.8/3.7/3.6/3.5/2.5/3) và "flash-lite" 2.5: 20 lượt/ngày.
+// - Các model "flash-lite" 3.1/3.5: 500 lượt/ngày.
+const MODEL_QUOTA: Record<string, ModelQuota> = {
+  "gemini-3.8-flash": { rpd: 20, rpm: 5, tpm: 250000 },
+  "gemini-3.5-flash": { rpd: 20, rpm: 5, tpm: 250000 },
+  "gemini-3.7-flash": { rpd: 20, rpm: 5, tpm: 250000 },
+  "gemini-3.6-flash": { rpd: 20, rpm: 5, tpm: 250000 },
+  "gemini-2.5-flash": { rpd: 20, rpm: 5, tpm: 250000 },
+  "gemini-3-flash": { rpd: 20, rpm: 5, tpm: 250000 },
+  "gemini-2.5-flash-lite": { rpd: 20, rpm: 10, tpm: 250000 },
+  "gemini-3.1-flash-lite": { rpd: 500, rpm: 15, tpm: 250000 },
+  "gemini-3.5-flash-lite": { rpd: 500, rpm: 15, tpm: 250000 },
+};
+
+// Tổng sức chứa thật của 1 key trên các model đang dùng (gộp trần của từng model).
+const DEFAULT_AI_KEY_DAILY_LIMIT = Object.values(MODEL_QUOTA).reduce(
+  (a, q) => a + q.rpd,
+  0
+);
 
 function budgetFor(limit?: number): number {
   const n = Math.floor(Number(limit) || 0);
@@ -575,40 +600,101 @@ function budgetFor(limit?: number): number {
 
 const AI_USAGE_FILE = path.join(process.cwd(), "data", "ai-usage.json");
 
-function readAiUsageFile(): { date: string; counts: Record<string, number> } {
+// Giờ reset quota THẬT của Google: 00:00 giờ Thái Bình Dương (PST = UTC-8, PDT = UTC-7).
+function pacificOffsetHours(): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    const tz = parts.find((p) => p.type === "timeZoneName")?.value || "PDT";
+    return tz.includes("PDT") ? 7 : 8;
+  } catch {
+    return 7;
+  }
+}
+
+// Ngày đếm lượt AI tính theo giờ reset của Google → khi Google reset thì bộ đếm tự reset.
+function statAiDay(): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+// Số ms còn lại tới lúc Google reset quota (00:00 giờ Thái Bình Dương).
+function nextAiKeyReset(): number {
+  try {
+    const [y, m, d] = statAiDay().split("-").map(Number);
+    return Math.max(0, Date.UTC(y, m - 1, d + 1, pacificOffsetHours(), 0, 0, 0) - Date.now());
+  } catch {
+    const next = new Date();
+    next.setUTCHours(24, 0, 0, 0);
+    return Math.max(0, next.getTime() - Date.now());
+  }
+}
+
+type AiUsageStore = {
+  date: string;
+  counts: Record<string, number>; // "key" -> tổng lượt/ngày (để hiển thị)
+  modelCounts: Record<string, number>; // "key|model" -> lượt thật theo từng model
+};
+
+function readAiUsageFile(): AiUsageStore {
   try {
     if (fs.existsSync(AI_USAGE_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(AI_USAGE_FILE, "utf-8"));
       return {
         date: String(parsed?.date || ""),
         counts: parsed?.counts && typeof parsed.counts === "object" ? parsed.counts : {},
+        modelCounts:
+          parsed?.modelCounts && typeof parsed.modelCounts === "object"
+            ? parsed.modelCounts
+            : {},
       };
     }
   } catch {
     // ignore
   }
-  return { date: "", counts: {} };
+  return { date: "", counts: {}, modelCounts: {} };
 }
 
-let aiUsageCache: { date: string; counts: Record<string, number> } = { date: "", counts: {} };
+let aiUsageCache: AiUsageStore = { date: "", counts: {}, modelCounts: {} };
 
-function getAiUsageSnapshot(): { date: string; counts: Record<string, number> } {
-  if (aiUsageCache.date !== statDay()) {
+function getAiUsageSnapshot(): AiUsageStore {
+  if (aiUsageCache.date !== statAiDay()) {
     const stored = readAiUsageFile();
-    aiUsageCache = stored.date === statDay() ? stored : { date: statDay(), counts: {} };
+    aiUsageCache =
+      stored.date === statAiDay() ? stored : { date: statAiDay(), counts: {}, modelCounts: {} };
   }
   return aiUsageCache;
 }
 
-function bumpAiUsage(key: string) {
+// Đếm lượt theo (key + model) → tôn trọng đúng giới hạn thật của Google theo từng model.
+function bumpAiUsage(key: string, model: string) {
   const snap = getAiUsageSnapshot();
   snap.counts[key] = (snap.counts[key] || 0) + 1;
+  const mk = `${key}|${model}`;
+  snap.modelCounts[mk] = (snap.modelCounts[mk] || 0) + 1;
   try {
     fs.mkdirSync(path.dirname(AI_USAGE_FILE), { recursive: true });
     fs.writeFileSync(AI_USAGE_FILE, JSON.stringify(snap), "utf-8");
   } catch (err) {
     console.warn("[AI] Không lưu được usage:", err);
   }
+}
+
+// Google báo 429 "đã hết lượt ngày" → dừng dùng model đó cho tới khi reset.
+function markModelExhausted(key: string, model: string) {
+  const snap = getAiUsageSnapshot();
+  const cap = getModelCap(model);
+  if (cap > 0) snap.modelCounts[`${key}|${model}`] = cap;
 }
 
 // Trả về danh sách key đang hoạt động kèm ngân sách (limit) + tên cho trang admin.
@@ -638,7 +724,7 @@ let geminiRotationIndex = 0;
 
 type GeminiClientEntry = { client: GoogleGenAI; key: string };
 
-// Ngân sách lượt/ngày của 1 key (lấy theo cấu hình trên web, mặc định 400).
+// Ngân sách lượt/ngày của 1 key (lấy theo cấu hình trên web, mặc định = tổng trần thật: 520).
 function getAiKeyBudget(key: string): number {
   for (const k of cachedSiteSettings?.ai?.keys || []) {
     if (k && k.enabled && (k.key || "").trim() === key) return budgetFor(k.limit);
@@ -657,10 +743,27 @@ function getAiKeyRemaining(key: string): number {
   return Math.max(0, getAiKeyBudget(key) - getAiKeyUsed(key));
 }
 
+// Giới hạn thật của 1 model (lấy từ bảng quota AI Studio).
+function getModelCap(model: string): number {
+  return MODEL_QUOTA[model]?.rpd ?? 0;
+}
+
+// Số lượt THẬT đã dùng của (key, model) hôm nay.
+function getModelUsed(key: string, model: string): number {
+  const snap = getAiUsageSnapshot();
+  return Number(snap.modelCounts[`${key}|${model}`] || 0);
+}
+
+// Lượt còn lại thật của (key, model).
+function getModelRemaining(key: string, model: string): number {
+  return Math.max(0, getModelCap(model) - getModelUsed(key, model));
+}
+
 // Trả về danh sách các Gemini client, TỰ ĐỘNG phân bổ hợp lý để tránh bị giới hạn:
 // - Loại key đã dùng hết lượt hôm nay (remaining = 0).
 // - Xếp key còn nhiều lượt dùng nhất lên đầu (key ít lượt dùng sẽ hứng nhiều request hơn).
 // - Giữ 1 vòng xoay nhỏ để không mãi phụ thuộc cùng 1 key khi các key còn dư như nhau.
+// - Bên trong mỗi key còn tự chọn model còn nhiều lượt thật nhất (xem getUsableModelsFor).
 function getGeminiClients(): GeminiClientEntry[] {
   const keys = getSiteGeminiApiKeys();
   if (keys.length === 0) {
@@ -694,13 +797,40 @@ function getGeminiClients(): GeminiClientEntry[] {
   });
 }
 
-// Fallback chain for text/multimodal generation:
-// If gemini-3.8-flash is experiencing high demand (503), fall back to gemini-flash-latest, then gemini-3.1-flash-lite
+// Mở rộng sang TẤT CẢ model có quota thật trong bảng free AI Studio để tận dụng tối đa,
+// không bị giới hạn: các model flash (20/ngày) cho chất lượng cao, flash-lite (500/ngày)
+// cho công suất lớn. Mỗi request chọn model còn nhiều lượt thật nhất (xem getUsableModelsFor).
 const FALLBACK_MODELS = [
   "gemini-3.8-flash",
-  "gemini-flash-latest",
+  "gemini-3.5-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-2.5-flash",
+  "gemini-3-flash",
+  "gemini-2.5-flash-lite",
   "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
 ];
+
+// Model bị Google từ chối (404/NOT_FOUND hoặc đã ngừng) sẽ bị loại hẳn khỏi chuỗi
+// cho tới khi server khởi động lại, tránh gọi lại model chết mỗi lần.
+const BROKEN_MODELS = new Set<string>();
+function rememberBrokenModel(model: string) {
+  if (model) BROKEN_MODELS.add(model);
+}
+
+// Danh sách model còn lượt của 1 key, xếp model còn nhiều lượt (theo quota thật) lên trước.
+function getUsableModelsFor(key: string, preferred?: string): string[] {
+  const base = preferred
+    ? [preferred, ...FALLBACK_MODELS.filter((m) => m !== preferred)]
+    : FALLBACK_MODELS;
+  return base
+    .filter((m) => !BROKEN_MODELS.has(m))
+    .map((m) => ({ m, r: getModelRemaining(key, m) }))
+    .filter((x) => x.r > 0)
+    .sort((a, b) => b.r - a.r)
+    .map((x) => x.m);
+}
 
 function parseGeminiErrorMessage(err: any): string {
   if (!err) return "Lỗi không xác định khi kết nối với AI.";
@@ -747,10 +877,6 @@ async function generateContentWithFallback(
     preferredModel?: string;
   }
 ): Promise<GenerateContentResponse> {
-  const models = params.preferredModel
-    ? [params.preferredModel, ...FALLBACK_MODELS.filter((m) => m !== params.preferredModel)]
-    : FALLBACK_MODELS;
-
   let lastError: any = null;
 
   // Lần lượt thử từng key (ưu tiên key còn nhiều lượt), với mỗi key sẽ chạy chuỗi dự phòng model.
@@ -761,16 +887,24 @@ async function generateContentWithFallback(
       console.log(`[Gemini] Bỏ qua key ${maskGeminiKey(key)}: đã hết lượt hôm nay.`);
       continue;
     }
+    // Chỉ thử những model còn lượt thật hôm nay, ưu tiên model còn nhiều lượt nhất.
+    const usableModels = getUsableModelsFor(key, params.preferredModel);
+    if (usableModels.length === 0) {
+      console.log(
+        `[Gemini] Bỏ qua key ${maskGeminiKey(key)}: tất cả model đã dùng hết lượt thật hôm nay.`
+      );
+      continue;
+    }
     const stat = getGeminiKeyStatsFor(key);
 
-    for (let i = 0; i < models.length; i++) {
-      const model = models[i];
+    for (let i = 0; i < usableModels.length; i++) {
+      const model = usableModels[i];
       const maxAttempts = 2;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         stat.requests += 1;
         stat.lastUsedAt = Date.now();
-        bumpAiUsage(key);
+        bumpAiUsage(key, model);
         try {
           console.log(
             `[Gemini] key#${k + 1}/${entries.length} ${maskGeminiKey(key)} model ${model} (attempt ${attempt}/${maxAttempts})...`
@@ -805,6 +939,30 @@ async function generateContentWithFallback(
             errMsg.includes("429") ||
             errMsg.includes("RESOURCE_EXHAUSTED") ||
             errMsg.includes("fetch failed");
+
+          // Model không tồn tại (404) → loại hẳn khỏi chuỗi để không gọi lại mỗi lần.
+          if (
+            errMsg.includes("404") ||
+            errMsg.includes("NOT_FOUND") ||
+            errMsg.includes("not found") ||
+            errMsg.includes("does not exist")
+          ) {
+            rememberBrokenModel(model);
+            console.warn(`[Gemini] Loại model ${model} (không tồn tại/đã ngừng).`);
+          }
+
+          // 429 do đã HẾT LƯỢT NGÀY (không phải giới hạn theo phút) → ghi nhận thật từ Google
+          // và ngừng dùng model này đến lúc reset (00:00 giờ Thái Bình Dương).
+          if (
+            (errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) &&
+            !/per minute/i.test(errMsg) &&
+            /day|daily|per_day|24h|quota/i.test(errMsg)
+          ) {
+            markModelExhausted(key, model);
+            console.warn(
+              `[Gemini] Model ${model} key ${maskGeminiKey(key)} đã chạm trần NGÀY thật (429), dừng dùng tới reset.`
+            );
+          }
 
           if (isTemporary && attempt < maxAttempts) {
             // Exponential delay before retry
@@ -1903,23 +2061,28 @@ async function startServer() {
   // API: Sức khỏe + dự tính cấu hình tiết kiệm nhất cho các API key AI (admin)
   app.get("/api/admin/ai-health", requireAdmin, async (_req, res) => {
     try {
+      await readSiteSettings(); // đảm bảo cache cài đặt đã được nạp trước khi đọc key
       const infos = getAiKeyBudgetInfos();
       const usageSnap = getAiUsageSnapshot();
-      const now = Date.now();
 
-      const nextReset = new Date();
-      nextReset.setUTCHours(24, 0, 0, 0); // reset theo ngày UTC (00:00)
-      const resetInMs = Math.max(0, nextReset.getTime() - now);
+      const resetInMs = nextAiKeyReset(); // reset theo giờ THẬT của Google (00:00 Thái Bình Dương)
 
       const keys = infos.map((info) => {
         const s = geminiKeyStats.get(info.key);
-        const usedToday = usageSnap.counts[info.key] || 0;
+        const usedToday = Number(usageSnap.counts[info.key] || 0);
+        const models = FALLBACK_MODELS.map((model) => ({
+          model,
+          cap: getModelCap(model),
+          usedToday: getModelUsed(info.key, model),
+          remaining: getModelRemaining(info.key, model),
+        }));
         return {
           key: maskGeminiKey(info.key),
           name: info.name || undefined,
           limit: info.limit,
           usedToday,
           remaining: Math.max(0, info.limit - usedToday),
+          models,
           requests: s?.requests || 0,
           successes: s?.successes || 0,
           failures: s?.failures || 0,
@@ -1938,13 +2101,15 @@ async function startServer() {
         : 0;
       const todayDemand = aiSum(overview.todayEvents);
 
-      const totalBudget = infos.reduce((a, i) => a + i.limit, 0);
-      const totalUsedToday = keys.reduce((a, k) => a + k.usedToday, 0);
-      const totalRemaining = keys.reduce((a, k) => a + k.remaining, 0);
       const activeCount = infos.length;
-      const limitAvg = activeCount
-        ? Math.max(1, Math.round(totalBudget / activeCount))
-        : DEFAULT_AI_KEY_DAILY_LIMIT;
+      const perKeyRealBudget = FALLBACK_MODELS.reduce((a, m) => a + getModelCap(m), 0);
+      const totalBudget = activeCount * perKeyRealBudget;
+      const totalUsedToday = keys.reduce((a, k) => a + k.usedToday, 0);
+      const totalRemaining = keys.reduce(
+        (a, k) => a + k.models.reduce((x, m) => x + m.remaining, 0),
+        0
+      );
+      const limitAvg = activeCount ? perKeyRealBudget : DEFAULT_AI_KEY_DAILY_LIMIT;
 
       const demand = Math.max(avg7, todayDemand);
       const neededKeys = limitAvg > 0 ? Math.max(1, Math.ceil((demand * 1.5) / limitAvg)) : 1;
