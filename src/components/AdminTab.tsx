@@ -31,6 +31,7 @@ import {
   Plus,
   RefreshCw,
   HeartPulse,
+  Settings,
 } from 'lucide-react';
 
 interface AiKeyConfig {
@@ -50,6 +51,7 @@ interface SiteSettings {
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
   ai: { geminiKey: string; keys: AiKeyConfig[] };
+  freeUsageLimit?: number;
 }
 
 interface StatsOverview {
@@ -1260,6 +1262,29 @@ export default function AdminTab() {
             </div>
           </div>
         )}
+
+        <div className="border-t border-slate-100 pt-3 flex items-center gap-2.5">
+          <div className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500">
+            <Settings className="w-4 h-4" />
+          </div>
+          <label className="text-xs font-bold text-slate-700">
+            Giới hạn lượt Soạn bài miễn phí
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={settings?.freeUsageLimit ?? 2}
+            onChange={(e) =>
+              setSettings((prev) =>
+                prev
+                  ? { ...prev, freeUsageLimit: Math.max(1, Math.floor(Number(e.target.value)) || 2) }
+                  : prev
+              )
+            }
+            className="w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-center focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
+          />
+          <span className="text-[10px] text-slate-500">lượt/ngày/IP · VIP không giới hạn</span>
+        </div>
 
         <div className="px-3 py-2 rounded-xl bg-indigo-50/50 text-[11px] text-slate-500 flex items-start gap-1.5">
           <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0 text-indigo-500" />

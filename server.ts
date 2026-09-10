@@ -999,7 +999,6 @@ function touchOnlineSession(ip: string): number {
   return ONLINE_SESSIONS.size;
 }
 
-const USAGE_LIMIT_PER_DAY = 2;
 const USAGE_DATA_FILE = path.join(process.cwd(), "data", "usage.json");
 
 function usageKey(req: express.Request): string {
@@ -1432,10 +1431,11 @@ async function checkAiUsageLimit(
     if (user && (await isVip(user))) return true;
   }
   const used = await readUsageCount(usageKey(req));
-  if (used >= USAGE_LIMIT_PER_DAY) {
+  const { freeUsageLimit } = await readSiteSettings();
+  if (used >= freeUsageLimit) {
     res.status(429).json({
-      error: `Bạn đã dùng hết ${USAGE_LIMIT_PER_DAY} lượt AI miễn phí hôm nay. Nâng cấp VIP để dùng không giới hạn!`,
-      usage: { limit: USAGE_LIMIT_PER_DAY, used, remaining: 0 },
+      error: `Bạn đã dùng hết ${freeUsageLimit} lượt AI miễn phí hôm nay. Nâng cấp VIP để dùng không giới hạn!`,
+      usage: { limit: freeUsageLimit, used, remaining: 0 },
       vipRequired: true,
     });
     return false;
@@ -1635,6 +1635,7 @@ interface SiteSettings {
   announcement: { enabled: boolean; text: string };
   donate: { enabled: boolean; qrImage: string; note: string };
   ai: { geminiKey: string; keys: AiKeyConfig[] };
+  freeUsageLimit: number;
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -1642,7 +1643,13 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
   announcement: { enabled: false, text: "" },
   donate: { enabled: false, qrImage: "", note: "" },
   ai: { geminiKey: "", keys: [] },
+  freeUsageLimit: 2,
 };
+
+function normalizeFreeAiLimit(n: any): number {
+  const v = Math.floor(Number(n));
+  return v > 0 ? Math.min(v, 100000) : 2;
+}
 
 function normalizeMaintenanceModules(m: any): {
   note: boolean;
@@ -1734,6 +1741,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
             note: String(parsed.donate?.note || ""),
           },
           ai: normalizeAiConfig(parsed.ai),
+          freeUsageLimit: normalizeFreeAiLimit(parsed.freeUsageLimit),
         };
         return cachedSiteSettings;
       }
@@ -1760,6 +1768,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
             note: String(parsed.donate?.note || ""),
           },
           ai: normalizeAiConfig(parsed.ai),
+          freeUsageLimit: normalizeFreeAiLimit(parsed.freeUsageLimit),
         };
       return cachedSiteSettings;
     }
@@ -1771,6 +1780,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
     announcement: { enabled: false, text: "" },
     donate: { enabled: false, qrImage: "", note: "" },
     ai: { geminiKey: "", keys: [] },
+    freeUsageLimit: 2,
   };
   return cachedSiteSettings;
 }
@@ -1875,10 +1885,11 @@ async function startServer() {
         const user = await getUserById(userId);
         isVipUser = user ? await isVip(user) : false;
       }
+      const { freeUsageLimit } = await readSiteSettings();
       res.json({
-        limit: USAGE_LIMIT_PER_DAY,
+        limit: freeUsageLimit,
         used,
-        remaining: isVipUser ? 999999 : Math.max(0, USAGE_LIMIT_PER_DAY - used),
+        remaining: isVipUser ? 999999 : Math.max(0, freeUsageLimit - used),
         date: new Date().toISOString().slice(0, 10),
         isVip: isVipUser,
       });
@@ -2037,6 +2048,7 @@ async function startServer() {
             .join("\n"),
           keys: aiKeys,
         },
+        freeUsageLimit: normalizeFreeAiLimit(req.body?.freeUsageLimit ?? current.freeUsageLimit),
       };
       await writeSiteSettings(next);
       res.json(next);
