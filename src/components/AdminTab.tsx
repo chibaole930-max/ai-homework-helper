@@ -1013,8 +1013,8 @@ export default function AdminTab() {
                         limit: e.target.value === '' ? undefined : Math.max(1, Number(e.target.value)),
                       })
                     }
-                    placeholder="20"
-                    title={`Giới hạn lượt/ngày (bỏ trống = 20)`}
+                    placeholder="400"
+                    title={`Giới hạn lượt/ngày (bỏ trống = 400)`}
                     className="w-16 shrink-0 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-center focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none"
                   />
                   <label className="flex items-center gap-1.5 cursor-pointer shrink-0 text-[11px] font-bold text-slate-600">
@@ -1224,7 +1224,7 @@ export default function AdminTab() {
                     Nên có ~<b>{aiHealth.summary.neededKeys}</b> key (đang có{' '}
                     <b>{aiHealth.summary.activeCount}</b>). Bổ sung ≈
                     <b>{aiHealth.summary.extraKeys}</b> key nữa để tránh gián đoạn. Khi để trống
-                    giới hạn, mỗi key mặc định <b>20 lượt/ngày</b>.
+                    giới hạn, mỗi key mặc định <b>400 lượt/ngày</b>.
                   </span>
                 )}
                 {aiHealth.summary.status === 'exhausted' && (

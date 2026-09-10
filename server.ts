@@ -566,7 +566,7 @@ function maskGeminiKey(key: string): string {
 // ---------------------------------------------------------------------------
 // NGÂN SÁCH/ĐẾM LƯỢT THEO NGÀY CHO TỪNG KEY (persist qua file)
 // ---------------------------------------------------------------------------
-const DEFAULT_AI_KEY_DAILY_LIMIT = 20;
+const DEFAULT_AI_KEY_DAILY_LIMIT = 400;
 
 function budgetFor(limit?: number): number {
   const n = Math.floor(Number(limit) || 0);
@@ -638,19 +638,48 @@ let geminiRotationIndex = 0;
 
 type GeminiClientEntry = { client: GoogleGenAI; key: string };
 
-// Trả về danh sách các Gemini client (mỗi key 1 client), đã xoay vòng vị trí
-// bắt đầu để phân bổ tải đều giữa các key khi có nhiều key.
+// Ngân sách lượt/ngày của 1 key (lấy theo cấu hình trên web, mặc định 400).
+function getAiKeyBudget(key: string): number {
+  for (const k of cachedSiteSettings?.ai?.keys || []) {
+    if (k && k.enabled && (k.key || "").trim() === key) return budgetFor(k.limit);
+  }
+  return budgetFor(undefined);
+}
+
+// Số lượt key đã dùng hôm nay (tính từ file đếm theo ngày).
+function getAiKeyUsed(key: string): number {
+  const snap = getAiUsageSnapshot();
+  return Number(snap.counts[key] || 0);
+}
+
+// Số lượt key còn lại hôm nay.
+function getAiKeyRemaining(key: string): number {
+  return Math.max(0, getAiKeyBudget(key) - getAiKeyUsed(key));
+}
+
+// Trả về danh sách các Gemini client, TỰ ĐỘNG phân bổ hợp lý để tránh bị giới hạn:
+// - Loại key đã dùng hết lượt hôm nay (remaining = 0).
+// - Xếp key còn nhiều lượt dùng nhất lên đầu (key ít lượt dùng sẽ hứng nhiều request hơn).
+// - Giữ 1 vòng xoay nhỏ để không mãi phụ thuộc cùng 1 key khi các key còn dư như nhau.
 function getGeminiClients(): GeminiClientEntry[] {
   const keys = getSiteGeminiApiKeys();
   if (keys.length === 0) {
     throw new Error("Chưa cấu hình Gemini API key trên web. Vào Quản trị để thêm key.");
   }
+  const ranked = keys
+    .map((key) => ({ key, remaining: getAiKeyRemaining(key) }))
+    .filter((x) => x.remaining > 0)
+    .sort((a, b) => b.remaining - a.remaining);
+  if (ranked.length === 0) {
+    throw new Error("Tất cả Gemini API key đã dùng hết lượt trong ngày. Vào Quản trị để kiểm tra hoặc tăng giới hạn.");
+  }
+  // Xoay vòng trong nhóm key còn hạn để cân bằng khi các key có mức dư bằng nhau.
   const rotated = [
-    ...keys.slice(geminiRotationIndex),
-    ...keys.slice(0, geminiRotationIndex),
+    ...ranked.slice(geminiRotationIndex % ranked.length),
+    ...ranked.slice(0, geminiRotationIndex % ranked.length),
   ];
-  geminiRotationIndex = (geminiRotationIndex + 1) % keys.length;
-  return rotated.map((key) => {
+  geminiRotationIndex += 1;
+  return rotated.map(({ key }) => {
     return {
       key,
       client: new GoogleGenAI({
@@ -724,9 +753,14 @@ async function generateContentWithFallback(
 
   let lastError: any = null;
 
-  // Lần lượt thử từng key (rotate từ đầu), với mỗi key sẽ chạy chuỗi dự phòng model.
+  // Lần lượt thử từng key (ưu tiên key còn nhiều lượt), với mỗi key sẽ chạy chuỗi dự phòng model.
   for (let k = 0; k < entries.length; k++) {
     const { client: ai, key } = entries[k];
+    // Bỏ qua key đã dùng hết lượt/ngày (tự động tránh bị limit).
+    if (getAiKeyRemaining(key) <= 0) {
+      console.log(`[Gemini] Bỏ qua key ${maskGeminiKey(key)}: đã hết lượt hôm nay.`);
+      continue;
+    }
     const stat = getGeminiKeyStatsFor(key);
 
     for (let i = 0; i < models.length; i++) {
