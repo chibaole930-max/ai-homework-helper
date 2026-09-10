@@ -996,7 +996,121 @@ function touchOnlineSession(ip: string): number {
   for (const [k, v] of ONLINE_SESSIONS) {
     if (now - v > ONLINE_TTL_MS) ONLINE_SESSIONS.delete(k);
   }
+  maybeSampleOnline();
   return ONLINE_SESSIONS.size;
+}
+
+// ---------------------------------------------------------------------------
+// LỊCH SỬ SỐ NGƯỜI ONLINE THEO MỐC THỜI GIAN
+// - Mẫu (sample) số người online định kỳ ~30-60s, lưu file dành riêng cho admin.
+// - Biểu đồ: theo giờ (24h gần nhất) và theo ngày (7 ngày gần nhất).
+// ---------------------------------------------------------------------------
+
+const ONLINE_HISTORY_FILE = path.join(process.cwd(), "data", "online-stats.json");
+const ONLINE_HISTORY_KEEP_MS = 8 * 86400000;
+const onlineHistory: { t: number; online: number }[] = [];
+let lastOnlineSampleTs = 0;
+
+function loadOnlineHistory(): void {
+  try {
+    if (fs.existsSync(ONLINE_HISTORY_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(ONLINE_HISTORY_FILE, "utf-8"));
+      if (Array.isArray(parsed)) {
+        const now = Date.now();
+        for (const x of parsed) {
+          if (x && typeof x.t === "number" && typeof x.online === "number") {
+            if (now - x.t <= ONLINE_HISTORY_KEEP_MS) onlineHistory.push({ t: x.t, online: x.online });
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function saveOnlineHistory(): void {
+  try {
+    fs.mkdirSync(path.dirname(ONLINE_HISTORY_FILE), { recursive: true });
+    fs.writeFileSync(ONLINE_HISTORY_FILE, JSON.stringify(onlineHistory), "utf-8");
+  } catch {
+    // ignore
+  }
+}
+
+function sampleOnline(): void {
+  const now = Date.now();
+  onlineHistory.push({ t: now, online: ONLINE_SESSIONS.size });
+  while (onlineHistory.length && now - onlineHistory[0].t > ONLINE_HISTORY_KEEP_MS) {
+    onlineHistory.shift();
+  }
+  saveOnlineHistory();
+}
+
+function maybeSampleOnline(): void {
+  const now = Date.now();
+  if (now - lastOnlineSampleTs < 30000) return;
+  lastOnlineSampleTs = now;
+  sampleOnline();
+}
+
+function getOnlineStatsSummary(): {
+  now: number;
+  windowMinutes: number;
+  onlineByHour: { label: string; online: number }[];
+  onlineByDay: { day: string; peak: number; avg: number; samples: number }[];
+} {
+  const now = Date.now();
+  maybeSampleOnline();
+
+  // 24 giờ gần nhất: chia theo giờ, lấy giá trị cao nhất trong mỗi giờ
+  const hours: { label: string; online: number }[] = [];
+  for (let i = 23; i >= 0; i--) {
+    const base = new Date(now - i * 3600000);
+    base.setMinutes(0, 0, 0);
+    hours.push({ label: `${String(base.getHours()).padStart(2, "0")}:00`, online: 0 });
+  }
+  const hourPos = new Map(hours.map((h, i) => [h.label, i]));
+  for (const s of onlineHistory) {
+    if (now - s.t > 24 * 3600000) continue;
+    const label = `${String(new Date(s.t).getHours()).padStart(2, "0")}:00`;
+    const pos = hourPos.get(label);
+    if (pos !== undefined && s.online > hours[pos].online) hours[pos].online = s.online;
+  }
+
+  // 7 ngày gần nhất: đỉnh cao + trung bình mỗi ngày
+  const start7 = now - 7 * 86400000;
+  const dayTotals = new Map<string, { sum: number; n: number; peak: number }>();
+  for (const s of onlineHistory) {
+    if (s.t < start7) continue;
+    const key = new Date(s.t).toISOString().slice(0, 10);
+    const cur = dayTotals.get(key);
+    if (cur) {
+      cur.sum += s.online;
+      cur.n++;
+      if (s.online > cur.peak) cur.peak = s.online;
+    } else {
+      dayTotals.set(key, { sum: s.online, n: 1, peak: s.online });
+    }
+  }
+  const onlineByDay: { day: string; peak: number; avg: number; samples: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const key = new Date(now - i * 86400000).toISOString().slice(0, 10);
+    const g = dayTotals.get(key);
+    onlineByDay.push({
+      day: key,
+      peak: g ? g.peak : 0,
+      avg: g && g.n ? Math.round(g.sum / g.n) : 0,
+      samples: g ? g.n : 0,
+    });
+  }
+
+  return {
+    now: ONLINE_SESSIONS.size,
+    windowMinutes: ONLINE_TTL_MS / 60000,
+    onlineByHour: hours,
+    onlineByDay,
+  };
 }
 
 const USAGE_DATA_FILE = path.join(process.cwd(), "data", "usage.json");
@@ -1860,6 +1974,10 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Nền tảng đo số người online theo mốc thời gian (admin)
+  loadOnlineHistory();
+  setInterval(sampleOnline, 60000).unref();
+
   // Render chạy sau proxy CDN/LB nên bật trust proxy để lấy đúng IP người dùng
   app.set("trust proxy", true);
 
@@ -2167,6 +2285,16 @@ async function startServer() {
     } catch (err: any) {
       console.error("Error loading stats:", err);
       res.status(500).json({ error: "Không tải được thống kê." });
+    }
+  });
+
+  // API: Số người online theo mốc thời gian (admin) — mẫu 24h theo giờ + 7 ngày
+  app.get("/api/admin/online-stats", requireAdmin, (_req, res) => {
+    try {
+      res.json(getOnlineStatsSummary());
+    } catch (err: any) {
+      console.error("Error loading online stats:", err);
+      res.status(500).json({ error: "Không tải được thống kê online." });
     }
   });
 

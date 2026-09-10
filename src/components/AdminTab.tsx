@@ -32,6 +32,7 @@ import {
   RefreshCw,
   HeartPulse,
   Settings,
+  Activity,
 } from 'lucide-react';
 
 interface AiKeyConfig {
@@ -66,6 +67,18 @@ interface StatsOverview {
   }[];
 }
 
+interface OnlineStats {
+  now: number;
+  windowMinutes: number;
+  onlineByHour: { label: string; online: number }[];
+  onlineByDay: { day: string; peak: number; avg: number; samples: number }[];
+}
+
+interface ChartDatum {
+  label: string;
+  value: number;
+}
+
 const STAT_EVENT_LABELS: Record<string, string> = {
   page_view: 'Lượt xem',
   lesson_note: 'Soạn bài',
@@ -73,6 +86,89 @@ const STAT_EVENT_LABELS: Record<string, string> = {
   tutor_followup: 'Hỏi đáp',
   community_share: 'Chia sẻ',
 };
+
+const CHART_METRIC_LABELS: Record<string, string> = {
+  total: 'Tổng lượt',
+  users: 'Người dùng',
+  page_view: 'Lượt xem',
+  lesson_note: 'Soạn bài',
+  solve_exercise: 'Giải bài',
+  tutor_followup: 'Hỏi đáp',
+  community_share: 'Chia sẻ',
+};
+
+function BarsChart({ data, barColor = 'bg-indigo-500' }: { data: ChartDatum[]; barColor?: string }) {
+  const max = Math.max(1, ...data.map((d) => d.value));
+  return (
+    <div>
+      <div className="flex items-end gap-1 h-36">
+        {data.map((d, i) => (
+          <div key={i} className="relative flex-1 flex items-end justify-center h-full group">
+            <div className="w-full max-w-6 rounded-t transition-all duration-500 group-hover:opacity-80">
+              <div
+                className={`${barColor} rounded-t`}
+                style={{ height: `${Math.max(2, Math.round((d.value / max) * 144))}px` }}
+                title={`${d.label}: ${d.value}`}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-1 mt-1">
+        {data.map((d, i) => (
+          <span key={i} className="flex-1 text-center text-[8px] text-slate-400 truncate" title={d.label}>
+            {d.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LineChart({ data, color = '#6366f1' }: { data: ChartDatum[]; color?: string }) {
+  const W = 640;
+  const H = 160;
+  const PAD = 6;
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const step = data.length > 1 ? (W - PAD * 2) / (data.length - 1) : 0;
+  const yOf = (v: number) => H - PAD - (v / max) * (H - PAD * 2);
+  const points = data
+    .map((d, i) => `${(PAD + i * step).toFixed(1)},${yOf(d.value).toFixed(1)}`)
+    .join(' ');
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-36">
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <line key={f} x1={PAD} y1={yOf(max * f)} x2={W - PAD} y2={yOf(max * f)} stroke="#e2e8f0" strokeWidth="1" />
+        ))}
+        <polyline
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {data.map((d, i) => (
+          <circle
+            key={i}
+            cx={PAD + i * step}
+            cy={yOf(d.value)}
+            r="3"
+            fill={color}
+          />
+        ))}
+      </svg>
+      <div className="flex gap-1 mt-1">
+        {data.map((d, i) => (
+          <span key={i} className="flex-1 text-center text-[8px] text-slate-400 truncate" title={d.label}>
+            {d.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface PendingPresetItem {
   id: string;
@@ -113,6 +209,11 @@ export default function AdminTab() {
 
   const [stats, setStats] = useState<StatsOverview | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [onlineStats, setOnlineStats] = useState<OnlineStats | null>(null);
+
+  const [chartMetric, setChartMetric] = useState('total');
+  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [chartRange, setChartRange] = useState<7 | 14>(7);
 
   const [vipKeys, setVipKeys] = useState<
     { code: string; plan: string; days: number; status: string; note: string; usedByEmail: string | null; usedAt: string | null; createdAt: string }[] | null
@@ -390,6 +491,20 @@ export default function AdminTab() {
       .finally(() => setStatsLoading(false));
     fetchVipKeys();
     loadOrders();
+
+    const loadOnline = () =>
+      fetch('/api/admin/online-stats', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(async (r) => {
+          if (!r.ok) throw new Error('online');
+          return r.json();
+        })
+        .then((d) => setOnlineStats(d as OnlineStats))
+        .catch(() => {});
+    loadOnline();
+    const onlineTimer = window.setInterval(loadOnline, 30000);
+    return () => window.clearInterval(onlineTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -414,6 +529,20 @@ export default function AdminTab() {
       .then((d) => setStats(d as StatsOverview))
       .catch(() => {})
       .finally(() => setStatsLoading(false));
+  };
+
+  const buildChartData = (): ChartDatum[] => {
+    if (!stats) return [];
+    const days = [...stats.daily].slice(-chartRange);
+    return days.map((r) => {
+      const [, m, d] = r.day.split('-');
+      let value = 0;
+      if (chartMetric === 'users') value = r.uniqueVisitors;
+      else if (chartMetric === 'total') value = Object.values(r.events).reduce((s, v) => s + v, 0);
+      else value = r.events[chartMetric] || 0;
+      const isToday = r.day === stats.today;
+      return { label: isToday ? 'Hôm nay' : `${d}/${m}`, value };
+    });
   };
 
   const handleApprovePending = async (id: string) => {
@@ -1362,6 +1491,67 @@ export default function AdminTab() {
               ))}
             </div>
 
+            {/* Biểu đồ Thống Kê Sử Dụng Thật */}
+            <div className="rounded-xl border border-slate-200 p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                  <BarChart3 className="w-3.5 h-3.5 text-teal-600" />
+                  Biểu đồ xu hướng
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <select
+                    value={chartMetric}
+                    onChange={(e) => setChartMetric(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 bg-white outline-none focus:border-teal-300"
+                  >
+                    {Object.keys(CHART_METRIC_LABELS).map((m) => (
+                      <option key={m} value={m}>
+                        {CHART_METRIC_LABELS[m]}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5">
+                    {(['bar', 'line'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setChartType(t)}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                          chartType === t ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {t === 'bar' ? 'Cột' : 'Đường'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5">
+                    {([7, 14] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setChartRange(r)}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                          chartRange === r ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {r} ngày
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-400 px-0.5">
+                Đang xem: <b className="text-slate-600">{CHART_METRIC_LABELS[chartMetric]}</b> — {chartRange} ngày
+              </div>
+              <div className="bg-slate-50/60 rounded-lg p-2">
+                {chartType === 'bar' ? (
+                  <BarsChart data={buildChartData()} />
+                ) : (
+                  <LineChart data={buildChartData()} />
+                )}
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
                 <thead>
@@ -1397,6 +1587,79 @@ export default function AdminTab() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* Số người online theo mốc thời gian */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600">
+              <Activity className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800">Số Người Online Theo Thời Gian</h2>
+              <p className="text-[11px] text-slate-500">
+                Đo lấy mẫu mỗi ~30 - 60 giây. Đang truy cập trong {onlineStats ? onlineStats.windowMinutes : 5} phút gần nhất.
+              </p>
+            </div>
+          </div>
+          {onlineStats ? (
+            <div className="text-right shrink-0">
+              <div className="text-[10px] font-bold text-slate-500 uppercase">Đang online</div>
+              <div className="text-2xl font-extrabold text-emerald-600 leading-none mt-0.5">
+                {onlineStats.now}
+                <span className="text-xs text-slate-400 font-bold ml-1">người</span>
+              </div>
+            </div>
+          ) : (
+            <Loader2 className="w-4 h-4 animate-spin text-slate-300 shrink-0" />
+          )}
+        </div>
+
+        {onlineStats ? (
+          <>
+            <div>
+              <div className="text-[11px] font-bold text-slate-600 mb-1.5">
+                Online theo giờ — 24h gần nhất (đỉnh cao mỗi giờ)
+              </div>
+              <div className="bg-emerald-50/50 rounded-xl p-2">
+                <BarsChart data={onlineStats.onlineByHour.map((h) => ({ label: h.label, value: h.online }))} barColor="bg-emerald-500" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-bold text-slate-600 mb-1.5">Theo ngày — 7 ngày gần nhất</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="text-slate-400 border-b border-slate-200">
+                      <th className="text-left py-1.5 font-bold">Ngày</th>
+                      <th className="text-right py-1.5 font-bold">Đỉnh cao</th>
+                      <th className="text-right py-1.5 font-bold">Trung bình</th>
+                      <th className="text-right py-1.5 font-bold">Số mẫu đo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {onlineStats.onlineByDay.map((row) => {
+                      const isToday = row.day === new Date().toISOString().slice(0, 10);
+                      const [, m, d] = row.day.split('-');
+                      return (
+                        <tr key={row.day} className="border-b border-slate-100">
+                          <td className="py-1.5 text-slate-600 font-semibold">
+                            {isToday ? 'Hôm nay' : `${d}/${m}`}
+                          </td>
+                          <td className="py-1.5 text-right font-bold text-emerald-600">{row.peak}</td>
+                          <td className="py-1.5 text-right text-slate-700">{row.avg}</td>
+                          <td className="py-1.5 text-right text-slate-400">{row.samples}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         ) : null}
