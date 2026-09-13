@@ -73,6 +73,8 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Tùy chọn nâng cao tạm ẩn để màn soạn bài gọn gàng, dễ dùng
+  const [showAdvanced, setShowAdvanced] = useState(false);
   // Hạn mức AI miễn phí (2 lượt/ngày theo IP); VIP không giới hạn
   const [usage, setUsage] = useState<{
     limit: number;
@@ -346,7 +348,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
                   1
                 </span>
-                Chọn Môn Học {gradeLabel}
+                Bước 1 • Chọn Môn Học {gradeLabel}
               </label>
               <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
                 11 Môn học
@@ -402,37 +404,133 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             </div>
           </div>
 
-          {/* 2. Chọn Bộ Sách Giáo Khoa */}
+          {/* ⚙️ Tùy chọn nâng cao (ẩn mặc định để màn hình gọn, dễ dùng) */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-                  2
-                </span>
-                Bộ Sách Giáo Khoa
-              </label>
-              <span className="text-xs font-medium text-slate-500">
-                Chương trình GDPT 2018
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between gap-2 text-sm font-bold text-slate-700 hover:text-indigo-700 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-slate-400" />
+                Tùy chọn nâng cao
               </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {textbooks.map((tb) => (
-                <button
-                  key={tb}
-                  onClick={() => setSelectedTextbook(tb)}
-                  className={`px-3 py-2 text-xs font-semibold rounded-lg border text-left transition-colors ${
-                    selectedTextbook === tb
-                      ? 'border-indigo-600 bg-indigo-50/80 text-indigo-900 font-bold'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {tb}
-                </button>
-              ))}
-            </div>
+              <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+                {showAdvanced ? 'Thu gọn ▲' : 'Mở ra ▼'}
+              </span>
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-4 pt-1 border-t border-slate-100">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600">Bộ Sách Giáo Khoa</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {textbooks.map((tb) => (
+                      <button
+                        key={tb}
+                        onClick={() => setSelectedTextbook(tb)}
+                        className={`px-3 py-2 text-xs font-semibold rounded-lg border text-left transition-colors ${
+                          selectedTextbook === tb
+                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-900 font-bold'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {tb}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-600">Chuyên mục muốn tập trung</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: 'all', label: 'Tất cả các phần' },
+                      { id: 'theory', label: 'Lý thuyết trọng tâm' },
+                      { id: 'activities', label: 'Khởi động & Khám phá' },
+                      { id: 'practice', label: 'Luyện tập & Vận dụng' },
+                      { id: 'exercises_sgk', label: 'Bài tập SGK' },
+                      { id: 'exercises_sbt', label: 'Bài tập SBT' },
+                    ].map((sec) => (
+                      <button
+                        key={sec.id}
+                        type="button"
+                        onClick={() => setLoigiaihaySection(sec.id as LoigiaihaySection)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                          loigiaihaySection === sec.id
+                            ? 'bg-amber-600 text-white border-amber-600 font-semibold shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {sec.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-slate-600">Mức độ chi tiết</span>
+                  <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setDetailLevel('basic')}
+                      className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                        detailLevel === 'basic'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Ngắn gọn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDetailLevel('standard')}
+                      className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                        detailLevel === 'standard'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Tiêu chuẩn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDetailLevel('advanced')}
+                      className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                        detailLevel === 'advanced'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Nâng cao
+                    </button>
+                  </div>
+                </div>
+
+                <input
+                  type="text"
+                  value={customNote}
+                  onChange={(e) => setCustomNote(e.target.value)}
+                  placeholder="Yêu cầu thêm (ví dụ: nhấn mạnh bài tập khó, kèm bài văn mẫu...)"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                />
+              </div>
+            )}
           </div>
 
-          {/* 3. Liệt kê các Phần & Bài học SGK (Chuẩn loigiaihay.com) */}
+          {/* Bước 2: Chọn bài học theo mục lục */}
+          <div className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+              2
+            </span>
+            <label className="text-sm font-bold text-slate-800">
+              Bước 2 • Chọn Bài Học
+            </label>
+            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md ml-auto">
+              {currentSubject.name}
+            </span>
+          </div>
+          {/* Liệt kê các Phần & Bài học SGK (Chuẩn loigiaihay.com) */}
           <CurriculumBrowser
             chapters={currentSubject.chapters || []}
             selectedSubject={currentSubject}
@@ -447,9 +545,9 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-                  4
+                  3
                 </span>
-                Kiểu Định Dạng Bài Soạn
+                Bước 3 • Chọn Kiểu Bài Soạn
               </label>
               <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
                 Chuẩn loigiaihay.com
@@ -564,87 +662,6 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                   Trắc nghiệm nhiều lựa chọn, đúng/sai, trả lời ngắn
                 </p>
               </button>
-            </div>
-
-            {/* Chuyên mục Lời Giải Hay */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <span className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-                <span>Chuyên mục muốn tập trung (loigiaihay.com):</span>
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { id: 'all', label: 'Tất cả các phần' },
-                  { id: 'theory', label: 'Lý thuyết trọng tâm' },
-                  { id: 'activities', label: 'Khởi động & Khám phá' },
-                  { id: 'practice', label: 'Luyện tập & Vận dụng' },
-                  { id: 'exercises_sgk', label: 'Bài tập SGK' },
-                  { id: 'exercises_sbt', label: 'Bài tập SBT' },
-                ].map((sec) => (
-                  <button
-                    key={sec.id}
-                    type="button"
-                    onClick={() => setLoigiaihaySection(sec.id as LoigiaihaySection)}
-                    className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
-                      loigiaihaySection === sec.id
-                        ? 'bg-amber-600 text-white border-amber-600 font-semibold shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {sec.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Detail Level */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-700">Mức độ chi tiết:</span>
-              <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setDetailLevel('basic')}
-                  className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
-                    detailLevel === 'basic'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Ngắn gọn
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDetailLevel('standard')}
-                  className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
-                    detailLevel === 'standard'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Tiêu chuẩn
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDetailLevel('advanced')}
-                  className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
-                    detailLevel === 'advanced'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Nâng cao
-                </button>
-              </div>
-            </div>
-
-            {/* Custom note */}
-            <div>
-              <input
-                type="text"
-                value={customNote}
-                onChange={(e) => setCustomNote(e.target.value)}
-                placeholder="Yêu cầu thêm (ví dụ: nhấn mạnh bài tập khó, kèm bài văn mẫu...)"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
-              />
             </div>
 
             {/* Error message */}

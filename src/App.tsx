@@ -371,7 +371,8 @@ function AppContent() {
             </div>
           ) : (
             <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
-              <AppDashboard
+<AppDashboard
+                grade={grade}
                 subjects={subjects}
                 savedItems={savedItems}
                 onOpenFeature={setOpenFeature}
@@ -395,7 +396,8 @@ function AppContent() {
       <main className="flex-1 min-h-0 overflow-hidden">
         {openFeature === null ? (
           <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <AppDashboard
+<AppDashboard
+              grade={grade}
               subjects={subjects}
               savedItems={savedItems}
               onOpenFeature={setOpenFeature}
