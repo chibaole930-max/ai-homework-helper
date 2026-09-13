@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Navbar, TabType } from './components/Navbar';
+import { Navbar } from './components/Navbar';
+import { AppDashboard, OpenFeature } from './components/AppDashboard';
 import { LessonNoteTab } from './components/LessonNoteTab';
 import { ExerciseSolverTab } from './components/ExerciseSolverTab';
 import { SavedNotesTab } from './components/SavedNotesTab';
@@ -16,7 +17,7 @@ import { VipModal } from './components/VipModal';
 import { SavedStudyItem, GradeId } from './types';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
-import { CheckCircle2, Sparkles, BookOpen, GraduationCap, Megaphone, Wrench, HeartHandshake, FolderHeart } from 'lucide-react';
+import { CheckCircle2, Megaphone, Wrench, HeartHandshake, FolderHeart, ArrowLeft } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
@@ -49,7 +50,7 @@ function ModuleMaintenancePanel({ message }: { message: string }) {
 }
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<TabType>('notes');
+  const [openFeature, setOpenFeature] = useState<OpenFeature | null>(null);
   const [grade, setGrade] = useState<GradeId>('12');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(
@@ -152,7 +153,6 @@ function AppContent() {
     openDonateOnce();
   }, [donateEnabled, announcementText]);
 
-  // Initialize saved items from localStorage or fallback to default sample presets
   const [savedItems, setSavedItems] = useState<SavedStudyItem[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -165,7 +165,6 @@ function AppContent() {
     return PRESET_LESSON_NOTES;
   });
 
-  // Sync to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedItems));
@@ -182,16 +181,13 @@ function AppContent() {
   };
 
   const handleSaveItem = (itemData: Omit<SavedStudyItem, 'id' | 'date'>) => {
-    // Check if duplicate title exists
     const exists = savedItems.some(
       (item) => item.title === itemData.title && item.subject === itemData.subject
     );
-
     if (exists) {
       showToast('Bài này đã có trong Vở Ghi của bạn!');
       return;
     }
-
     const newItem: SavedStudyItem = {
       ...itemData,
       id: 'saved-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
@@ -201,7 +197,6 @@ function AppContent() {
         year: 'numeric',
       }),
     };
-
     setSavedItems((prev) => [newItem, ...prev]);
     showToast('Đã lưu bài học vào Vở Ghi thành công!');
   };
@@ -256,123 +251,53 @@ function AppContent() {
     );
   }
 
-  if (siteStatus?.maintenance.enabled) {
-    const tabBlocked = activeTab !== 'saved';
-    return (
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
-        <Navbar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          savedCount={savedItems.length}
-          grade={grade}
-          onGradeChange={setGrade}
-          onlineCount={onlineCount}
-        />
-        {tabBlocked ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto">
-                <Wrench className="w-8 h-8" />
-              </div>
-              <h1 className="text-xl font-extrabold text-slate-900">
-                Hệ Thống Đang Bảo Trì
-              </h1>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                {siteStatus.maintenance.message ||
-                  'Chúng tôi đang nâng cấp và hoàn thiện. Vui lòng quay lại sau ít phút nữa nhé!'}
-              </p>
-              <button
-                onClick={() => setActiveTab('saved')}
-                className="mt-2 inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 transition-colors"
-              >
-                <FolderHeart className="w-4 h-4" />
-                Xem Vở Ghi của tôi
-              </button>
-            </div>
-          </div>
+  const FEATURE_TITLES: Record<OpenFeature, string> = {
+    notes: 'Soạn Bài Ghi',
+    solver: 'Giải Bài Tập',
+    presets: 'Kho Bài Mẫu',
+    saved: 'Vở Ghi',
+  };
+
+  const renderFeature = (feature: OpenFeature) => {
+    switch (feature) {
+      case 'notes':
+        return siteStatus?.maintenance?.modules?.note ? (
+          <ModuleMaintenancePanel message={siteStatus?.maintenance?.message ?? ''} />
         ) : (
-          <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-            <div className="mb-4 px-4 py-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs bg-amber-50 border-amber-200 text-amber-800">
-              <span className="font-medium flex items-center gap-1.5 leading-relaxed">
-                <Wrench className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                Hệ thống đang bảo trì: các tính năng AI &amp; Kho bài mẫu tạm khoá. Vở Ghi của bạn
-                vẫn hoạt động bình thường.
-              </span>
-              <button
-                onClick={() => setActiveTab('notes')}
-                className="font-bold text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
-              >
-                OK
-              </button>
-            </div>
-            <SavedNotesTab
-              items={savedItems}
-              onToggleFavorite={handleToggleFavorite}
-              onDeleteItem={handleDeleteItem}
-              onClearAll={handleClearAll}
-              subjects={subjects}
-              gradeLabel={gradeLabel}
-            />
-          </main>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Top Navbar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        savedCount={savedItems.length}
-        grade={grade}
-        onGradeChange={setGrade}
-        onlineCount={onlineCount}
-      />
-
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {activeTab === 'notes' &&
-          (siteStatus?.maintenance?.modules?.note ? (
-            <ModuleMaintenancePanel message={siteStatus.maintenance.message} />
-          ) : (
-            <LessonNoteTab
-              onSaveNote={handleSaveItem}
-              isItemSaved={isItemSaved}
-              subjects={subjects}
-              textbooks={textbooks}
-              gradeLabel={gradeLabel}
-              grade={grade}
-            />
-          ))}
-
-        {activeTab === 'solver' &&
-          (siteStatus?.maintenance?.modules?.solver ? (
-            <ModuleMaintenancePanel message={siteStatus.maintenance.message} />
-          ) : (
-            <ExerciseSolverTab
-              onSaveExercise={handleSaveItem}
-              isItemSaved={isItemSaved}
-              subjects={subjects}
-              gradeLabel={gradeLabel}
-              grade={grade}
-            />
-          ))}
-
-        {activeTab === 'presets' &&
-          (siteStatus?.maintenance?.modules?.presets ? (
-            <ModuleMaintenancePanel message={siteStatus.maintenance.message} />
-          ) : (
-            <PresetLibraryTab
-              onImportPreset={handleImportPreset}
-              isItemSaved={isItemSaved}
-              subjects={subjects}
-              grade={grade}
-            />
-          ))}
-
-        {activeTab === 'saved' && (
+          <LessonNoteTab
+            onSaveNote={handleSaveItem}
+            isItemSaved={isItemSaved}
+            subjects={subjects}
+            textbooks={textbooks}
+            gradeLabel={gradeLabel}
+            grade={grade}
+          />
+        );
+      case 'solver':
+        return siteStatus?.maintenance?.modules?.solver ? (
+          <ModuleMaintenancePanel message={siteStatus?.maintenance?.message ?? ''} />
+        ) : (
+          <ExerciseSolverTab
+            onSaveExercise={handleSaveItem}
+            isItemSaved={isItemSaved}
+            subjects={subjects}
+            gradeLabel={gradeLabel}
+            grade={grade}
+          />
+        );
+      case 'presets':
+        return siteStatus?.maintenance?.modules?.presets ? (
+          <ModuleMaintenancePanel message={siteStatus?.maintenance?.message ?? ''} />
+        ) : (
+          <PresetLibraryTab
+            onImportPreset={handleImportPreset}
+            isItemSaved={isItemSaved}
+            subjects={subjects}
+            grade={grade}
+          />
+        );
+      case 'saved':
+        return (
           <SavedNotesTab
             items={savedItems}
             onToggleFavorite={handleToggleFavorite}
@@ -381,10 +306,124 @@ function AppContent() {
             subjects={subjects}
             gradeLabel={gradeLabel}
           />
+        );
+    }
+  };
+
+  if (siteStatus?.maintenance.enabled) {
+    const featureBlocked = openFeature !== null && openFeature !== 'saved';
+    return (
+      <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden">
+        <Navbar
+          grade={grade}
+          onGradeChange={setGrade}
+          onlineCount={onlineCount}
+          onHome={() => setOpenFeature(null)}
+        />
+        <main className="flex-1 min-h-0 overflow-hidden">
+          {featureBlocked ? (
+            <div className="h-full flex items-center justify-center p-4">
+              <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto">
+                  <Wrench className="w-8 h-8" />
+                </div>
+                <h1 className="text-xl font-extrabold text-slate-900">
+                  Hệ Thống Đang Bảo Trì
+                </h1>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  {siteStatus?.maintenance?.message ||
+                    'Chúng tôi đang nâng cấp và hoàn thiện. Vui lòng quay lại sau ít phút nữa nhé!'}
+                </p>
+                <button
+                  onClick={() => setOpenFeature('saved')}
+                  className="mt-2 inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 transition-colors"
+                >
+                  <FolderHeart className="w-4 h-4" />
+                  Vào Vở Ghi của tôi
+                </button>
+              </div>
+            </div>
+          ) : openFeature === 'saved' ? (
+            <div className="h-full overflow-y-auto px-3 sm:px-6 lg:px-8">
+              <div className="max-w-7xl w-full mx-auto py-3 sm:py-4">
+                <div className="mb-3 px-4 py-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs bg-amber-50 border-amber-200 text-amber-800">
+                  <span className="font-medium flex items-center gap-1.5 leading-relaxed">
+                    <Wrench className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                    Hệ thống đang bảo trì: các tính năng AI &amp; Kho bài mẫu tạm khoá. Vở Ghi của bạn
+                    vẫn hoạt động bình thường.
+                  </span>
+                  <button
+                    onClick={() => setOpenFeature(null)}
+                    className="font-bold text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
+                  >
+                    Đóng
+                  </button>
+                </div>
+                <SavedNotesTab
+                  items={savedItems}
+                  onToggleFavorite={handleToggleFavorite}
+                  onDeleteItem={handleDeleteItem}
+                  onClearAll={handleClearAll}
+                  subjects={subjects}
+                  gradeLabel={gradeLabel}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
+              <AppDashboard
+                subjects={subjects}
+                savedItems={savedItems}
+                onOpenFeature={setOpenFeature}
+              />
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+      <Navbar
+        grade={grade}
+        onGradeChange={setGrade}
+        onlineCount={onlineCount}
+        onHome={() => setOpenFeature(null)}
+      />
+
+      <main className="flex-1 min-h-0 overflow-hidden">
+        {openFeature === null ? (
+          <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <AppDashboard
+              subjects={subjects}
+              savedItems={savedItems}
+              onOpenFeature={setOpenFeature}
+            />
+          </div>
+        ) : (
+          <div className="h-full flex flex-col">
+            <div className="shrink-0 flex items-center gap-2 px-3 sm:px-6 lg:px-8 py-2 bg-white border-b border-slate-200">
+              <button
+                onClick={() => setOpenFeature(null)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Bảng điều khiển
+              </button>
+              <span className="text-sm font-extrabold text-slate-800">
+                {FEATURE_TITLES[openFeature]}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 lg:px-8">
+              <div className="max-w-7xl w-full mx-auto py-3 sm:py-4">
+                {renderFeature(openFeature)}
+              </div>
+            </div>
+          </div>
         )}
       </main>
 
-      {/* Announcement Popup Modal */}
       {announcementVisible && announcementText && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -417,7 +456,6 @@ function AppContent() {
         </div>
       )}
 
-      {/* Donate QR Popup */}
       {donateVisible && siteStatus?.donate?.qrImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -460,36 +498,15 @@ function AppContent() {
         </div>
       )}
 
-      {/* Auth & VIP Modals */}
       <AuthModal />
       <VipModal />
 
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-medium animate-bounce-short">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="mt-12 bg-white border-t border-slate-200 py-6 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-slate-700 font-semibold">
-            <GraduationCap className="w-4 h-4 text-indigo-600" />
-            <span>Học Tập {gradeLabel} - Chương Trình GDPT 2018 Toàn Diện</span>
-          </div>
-
-          <div className="flex items-center flex-wrap justify-center gap-2 text-[11px] text-slate-500">
-            {subjects.slice(0, 7).map((s) => (
-              <span key={s.id} className="bg-slate-100 px-2 py-0.5 rounded-md">
-                {s.shortName} {grade}
-              </span>
-            ))}
-            <span className="text-slate-400">+ 4 môn khác</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
