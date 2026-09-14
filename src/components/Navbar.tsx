@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BookOpenCheck,
   Crown,
   LogOut,
   LayoutDashboard,
   Menu,
+  Moon,
+  Sun,
   X,
   User,
 } from 'lucide-react';
@@ -29,6 +31,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, openAuth, openVip, logout } = useAuth();
   const isVip = user?.isVip ?? false;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dark, setDark] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('theme');
+      if (stored) return stored === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    try {
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    } catch {
+      // ignore
+    }
+  }, [dark]);
 
   const goHome = () => {
     setMenuOpen(false);
@@ -87,6 +107,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {/* Light / Dark Toggle */}
+          <button
+            onClick={() => setDark((d) => !d)}
+            title={
+              dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'
+            }
+            aria-label="Đổi giao diện sáng / tối"
+            className="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 hover:text-indigo-600 active:scale-95 transition-all shrink-0"
+          >
+            {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
           {/* Grade Switcher */}
           <div className="flex items-center gap-1 px-1 py-1 rounded-xl bg-slate-100 border border-slate-200">
             <span className="text-[10px] font-bold text-slate-500 pl-1 pr-0.5 hidden lg:inline">
@@ -204,6 +236,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Đăng nhập / Đăng ký
               </button>
             )}
+            <button
+              onClick={() => setDark((d) => !d)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors text-left"
+            >
+              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {dark ? 'Giao diện sáng' : 'Giao diện tối'}
+            </button>
             <div className="px-3 pt-1.5 pb-1 flex items-center justify-between text-[11px] text-slate-400">
               <span>
                 Online:{' '}

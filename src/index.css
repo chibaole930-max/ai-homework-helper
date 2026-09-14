@@ -1,5 +1,57 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  .dark {
+    color-scheme: dark;
+    --color-white: #0f172a;
+    --color-slate-50: #0d1526;
+    --color-slate-100: #182136;
+    --color-slate-200: #1e293b;
+    --color-slate-300: #2e3d55;
+    --color-slate-400: #4b5a74;
+    --color-slate-500: #64748b;
+    --color-slate-600: #94a3b8;
+    --color-slate-700: #cbd5e1;
+    --color-slate-800: #e2e8f0;
+    --color-slate-900: #f1f5f9;
+    --color-slate-950: #f8fafc;
+  }
+
+  /* Chữ trắng trên nút gradient / nền đậm vẫn phải giữ trắng */
+  .dark .text-white {
+    color: #f8fafc;
+  }
+  .dark .text-slate-100 {
+    color: #e2e8f0;
+  }
+
+  /* Lớp phủ modal / toast / khối code vẫn giữ nền tối */
+  .dark .bg-slate-900\/50 {
+    background-color: rgba(2, 6, 23, 0.6);
+  }
+  .dark .bg-slate-900\/60 {
+    background-color: rgba(2, 6, 23, 0.65);
+  }
+  .dark .bg-slate-900 {
+    background-color: #0d1526;
+  }
+  .dark .bg-slate-800 {
+    background-color: #1e293b;
+  }
+  .dark .border-slate-800 {
+    border-color: #334155;
+  }
+
+  body {
+    background-color: #eef2f7;
+  }
+  .dark body {
+    background-color: #0b1220;
+  }
+}
+
 @keyframes announce-in {
   from {
     opacity: 0;
