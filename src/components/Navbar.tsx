@@ -35,8 +35,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     onHome?.();
   };
 
-  const gradeLabel = `Lớp ${grade}`;
-
   return (
     <header className="shrink-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-[52px] sm:h-14 flex items-center gap-1 sm:gap-3">
@@ -53,7 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-sm sm:text-base text-slate-900 tracking-tight whitespace-nowrap">
-                Học Tập <span className="text-indigo-600">{gradeLabel}</span>
+                StudyEZ
               </span>
               <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1.5 py-0.5 rounded-full uppercase tracking-wider hidden sm:inline-block">
                 GDPT 2018
