@@ -3,6 +3,11 @@
   "allowed_user_ids": [],
   "password": "hanks",
   "opencode_url": "http://localhost:4096",
+  "opencode_agent": "build",
+  "opencode_model": "opencode/big-pickle",
+  "opencode_repo": "",
+  "opencode_api_timeout": 180,
+  "opencode_cli_timeout": 90,
   "gemini_api_key": "",
   "gemini_model": "gemini-3.6-flash"
 }

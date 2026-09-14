@@ -48,12 +48,19 @@ Sửa `bot/config.json`:
   "allowed_user_ids": [],       
   "password": "hanks",          
   "opencode_url": "http://localhost:4096",
+  "opencode_agent": "build",
+  "opencode_model": "opencode/big-pickle",
+  "opencode_repo": "",
+  "opencode_api_timeout": 180,
+  "opencode_cli_timeout": 90,
   "gemini_api_key": "<Gemini API key>",
-  "gemini_model": "gemini-2.0-flash"
+  "gemini_model": "gemini-3.6-flash"
 }
 ```
 
-Hoặc dùng biến môi trường (ưu tiên hơn config file): `TELEGRAM_BOT_TOKEN`, `GEMINI_API_KEY`, `BOT_PASSWORD`, `OPENCODE_URL`.
+Hoặc dùng biến môi trường (ưu tiên hơn config file): `TELEGRAM_BOT_TOKEN`, `GEMINI_API_KEY`, `BOT_PASSWORD`, `OPENCODE_URL`, `OPENCODE_AGENT`, `OPENCODE_MODEL`, `OPENCODE_REPO`.
+
+> **Ghi chú OpenCode API**: Bot gọi `POST /session/{id}/message` của server opencode (kèm `agent` + `model`). Nếu server của bạn để `default_agent` không tồn tại hoặc model mặc định hết capacity, hãy điền `opencode_agent` và `opencode_model` là agent/model đang chạy được (kiểm tra bằng `/status` trong Telegram hoặc xem config của opencode). Nếu server HTTP không dùng được, bot tự fallback sang `opencode run <prompt>`.
 
 ## 🏃 Chạy bot
 

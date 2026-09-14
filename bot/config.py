@@ -47,6 +47,11 @@ def load_config() -> dict:
         "allowed_user_ids": raw.get("allowed_user_ids", []),
         "password": os.environ.get("BOT_PASSWORD") or raw.get("password", "hanks"),
         "opencode_url": os.environ.get("OPENCODE_URL") or raw.get("opencode_url", "http://localhost:4096"),
+        "opencode_agent": os.environ.get("OPENCODE_AGENT") or raw.get("opencode_agent", "build"),
+        "opencode_model": os.environ.get("OPENCODE_MODEL") or raw.get("opencode_model", "opencode/big-pickle"),
+        "opencode_repo": os.environ.get("OPENCODE_REPO") or raw.get("opencode_repo", ""),
+        "opencode_api_timeout": int(os.environ.get("OPENCODE_API_TIMEOUT") or raw.get("opencode_api_timeout", 180)),
+        "opencode_cli_timeout": int(os.environ.get("OPENCODE_CLI_TIMEOUT") or raw.get("opencode_cli_timeout", 90)),
         "gemini_api_key": os.environ.get("GEMINI_API_KEY") or raw.get("gemini_api_key", ""),
         "gemini_model": raw.get("gemini_model", "gemini-2.0-flash"),
     }
