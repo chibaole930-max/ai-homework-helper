@@ -20,7 +20,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'Calculator',
     description:
       'Số tự nhiên, số nguyên, phân số, số thập phân, hình học trực quan và hình phẳng cơ bản, dữ liệu và xác suất thực nghiệm',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-toan-6-ket-noi-tri-thuc-c3352.html',
+    loigiaihayUrl: 'https://loigiaihay.com/toan-lop-6-ket-noi-tri-thuc-voi-cuoc-song-c643.html',
     popularLessons: [
       'Tập hợp, phần tử của tập hợp',
       'Các phép toán với số tự nhiên',
@@ -140,7 +140,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'BookOpen',
     description:
       'Soạn văn 6 Kết nối tri thức: truyện đồng thoại, cổ tích, truyền thuyết, ngụ ngôn, thơ, kí và văn bản thông tin',
-    loigiaihayUrl: 'https://loigiaihay.com/soan-van-6-ket-noi-tri-thuc-c3354.html',
+    loigiaihayUrl: 'https://loigiaihay.com/soan-van-6-ket-noi-tri-thuc-voi-cuoc-song-sieu-ngan-c632.html',
     popularLessons: [
       'Soạn bài: Bài học đường đời đầu tiên',
       'Soạn bài: Thạch Sanh',
@@ -226,7 +226,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'BookMarked',
     description:
       'Tiếng Anh 6 Global Success: 12 unit theo chủ điểm, ngữ pháp và từ vựng trọng tâm, rèn kĩ năng nghe, nói, đọc, viết',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-tieng-anh-6-ket-noi-tri-thuc-c3355.html',
+    loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-6-Global-Success-ket-noi-tri-thuc-c645.html',
     popularLessons: [
       'Unit 1: My new school (Trường học mới của tôi)',
       'Unit 2: My house (Ngôi nhà của tôi)',
@@ -360,7 +360,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'FlaskConical',
     description:
       'KHTN 6 Kết nối tri thức: tích hợp Vật lí - Hoá học - Sinh học: mở đầu khoa học tự nhiên, tế bào và thế giới sống, chất và sự biến đổi của chất, năng lượng, trái đất và bầu trời',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-khtn-6-ket-noi-tri-thuc-c3356.html',
+    loigiaihayUrl: 'https://loigiaihay.com/khoa-hoc-tu-nhien-lop-6-ket-noi-tri-thuc-voi-cuoc-song-c615.html',
     popularLessons: [
       'Mở đầu về khoa học tự nhiên',
       'Tế bào - đơn vị cơ sở của sự sống',
@@ -455,7 +455,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'Globe2',
     description:
       'Tích hợp Lịch sử và Địa lí 6: khởi nguyên loài người, xã hội cổ đại và xã hội phong kiến; địa lí về trái đất, khí hậu, nước, đất và sinh vật trên Trái Đất',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-lich-su-va-dia-li-6-ket-noi-tri-thuc-c3357.html',
+    loigiaihayUrl: 'https://loigiaihay.com/lich-su-va-dia-li-lop-6-ket-noi-tri-thuc-c618.html',
     popularLessons: [
       'Khởi nguyên của loài người',
       'Xã hội cổ đại: Ai Cập, Lưỡng Hà, Ấn Độ, Trung Quốc',
@@ -578,7 +578,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'HeartHandshake',
     description:
       'Giáo dục công dân 6 Kết nối tri thức: giáo dục đạo đức, kĩ năng sống và pháp luật cho học sinh lớp 6',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-giao-duc-cong-dan-6-ket-noi-tri-thuc-c3358.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-giao-duc-cong-dan-lop-6-ket-noi-tri-thuc-c654.html',
     popularLessons: [
       'Tự hào về truyền thống gia đình, dòng họ',
       'Yêu thương con người',
@@ -692,7 +692,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'Laptop',
     description:
       'Tin học 6 Kết nối tri thức: mở đầu về máy tính, mạng máy tính và Internet, tổ chức lưu trữ tìm kiếm trao đổi thông tin, ứng dụng tin học',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-tin-hoc-6-ket-noi-tri-thuc-c3359.html',
+    loigiaihayUrl: 'https://loigiaihay.com/tin-hoc-lop-6-ket-noi-tri-thuc-c697.html',
     popularLessons: [
       'Thông tin và dữ liệu',
       'Máy tính và phần mềm máy tính',
@@ -760,7 +760,7 @@ export const SUBJECTS_6: SubjectInfo[] = [
     icon: 'Cpu',
     description:
       'Công nghệ 6 Kết nối tri thức: nhà ở, trang phục và thời trang, bảo quản và chế biến thực phẩm, đồ dùng điện gia đình',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-cong-nghe-6-ket-noi-tri-thuc-c3360.html',
+    loigiaihayUrl: 'https://loigiaihay.com/cong-nghe-lop-6-ket-noi-tri-thuc-c713.html',
     popularLessons: [
       'Nhà ở đối với đời sống con người',
       'Ngôi nhà thông minh',

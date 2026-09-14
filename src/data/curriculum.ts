@@ -652,7 +652,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Past Simple vs. Past Continuous, Vocabulary about inspiring lives',
       lessons: [
         { id: 'anh-l1', number: 'Lesson 1', title: 'Getting Started: Exceptional role models' },
-        { id: 'anh-l2', number: 'Lesson 2', title: 'Language: Pronunciation, Vocabulary & Past tenses' },
+        { id: 'anh-l2', number: 'Lesson 2', title: 'Language: Pronunciation, Vocabulary & Past tenses', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-1-tu-vung-a164628.html' },
         { id: 'anh-l3', number: 'Lesson 3', title: 'Reading: Stories of determination and success' },
         { id: 'anh-l4', number: 'Lesson 4', title: 'Writing: Writing a biography' },
       ],
@@ -663,7 +663,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Articles (a/an/the/zero article), Culture and identity',
       lessons: [
         { id: 'anh-l5', number: 'Lesson 1', title: 'Getting Started: Cultural diversity' },
-        { id: 'anh-l6', number: 'Lesson 2', title: 'Language: Article rules and vocabulary' },
+        { id: 'anh-l6', number: 'Lesson 2', title: 'Language: Article rules and vocabulary', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-2-tu-vung-a164629.html' },
         { id: 'anh-l7', number: 'Lesson 3', title: 'Reading: Preserving traditions in a globalized world' },
       ],
     },
@@ -673,7 +673,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Verbs with prepositions & Relative clauses, Environmental protection',
       lessons: [
         { id: 'anh-l8', number: 'Lesson 1', title: 'Getting Started: Sustainable lifestyle habits' },
-        { id: 'anh-l9', number: 'Lesson 2', title: 'Language: Verbs with prepositions & Relative clauses' },
+        { id: 'anh-l9', number: 'Lesson 2', title: 'Language: Verbs with prepositions & Relative clauses', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-3-tu-vung-a164764.html' },
         { id: 'anh-l10', number: 'Lesson 3', title: 'Reading: Eco-friendly innovations and carbon footprint' },
       ],
     },
@@ -683,7 +683,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Present perfect (review) & Double comparisons, Smart cities',
       lessons: [
         { id: 'anh-l11', number: 'Lesson 1', title: 'Getting Started: Pros and cons of megacities' },
-        { id: 'anh-l12', number: 'Lesson 2', title: 'Language: Present perfect & Double comparisons' },
+        { id: 'anh-l12', number: 'Lesson 2', title: 'Language: Present perfect & Double comparisons', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-4-tu-vung-a164765.html' },
         { id: 'anh-l13', number: 'Lesson 3', title: 'Reading: Sustainable urban development' },
       ],
     },
@@ -693,7 +693,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Simple/Compound/Complex sentences, Careers and future jobs',
       lessons: [
         { id: 'anh-l14', number: 'Lesson 1', title: 'Getting Started: Jobs and career planning' },
-        { id: 'anh-l15', number: 'Lesson 2', title: 'Language: Sentence structures & Prepositional phrases' },
+        { id: 'anh-l15', number: 'Lesson 2', title: 'Language: Sentence structures & Prepositional phrases', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-5-tu-vung-a164777.html' },
         { id: 'anh-l16', number: 'Lesson 3', title: 'Reading: How technology transforms workplaces' },
       ],
     },
@@ -703,7 +703,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Causative (active & passive), Technology and smart machines',
       lessons: [
         { id: 'anh-l17', number: 'Lesson 1', title: 'Getting Started: AI in daily life' },
-        { id: 'anh-l18', number: 'Lesson 2', title: 'Language: Causative forms & technical vocabulary' },
+        { id: 'anh-l18', number: 'Lesson 2', title: 'Language: Causative forms & technical vocabulary', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-6-tu-vung-a164854.html' },
         { id: 'anh-l19', number: 'Lesson 3', title: 'Reading: Applications of artificial intelligence' },
       ],
     },
@@ -713,7 +713,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Adverb clauses of manner & result, Media literacy',
       lessons: [
         { id: 'anh-l20', number: 'Lesson 1', title: 'Getting Started: Traditional and digital media' },
-        { id: 'anh-l21', number: 'Lesson 2', title: 'Language: Adverb clauses of manner & result' },
+        { id: 'anh-l21', number: 'Lesson 2', title: 'Language: Adverb clauses of manner & result', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-7-tu-vung-a165123.html' },
         { id: 'anh-l22', number: 'Lesson 3', title: 'Reading: Evaluating news and online information' },
       ],
     },
@@ -723,7 +723,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Adverb clauses of condition & comparison, Protecting endangered species',
       lessons: [
         { id: 'anh-l23', number: 'Lesson 1', title: 'Getting Started: Endangered animals' },
-        { id: 'anh-l24', number: 'Lesson 2', title: 'Language: Adverb clauses of condition & comparison' },
+        { id: 'anh-l24', number: 'Lesson 2', title: 'Language: Adverb clauses of condition & comparison', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-8-tu-vung-a165114.html' },
         { id: 'anh-l25', number: 'Lesson 3', title: 'Reading: Conservation efforts around the world' },
       ],
     },
@@ -733,7 +733,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Three-part phrasal verbs, Choosing a future job',
       lessons: [
         { id: 'anh-l26', number: 'Lesson 1', title: 'Getting Started: Finding your dream job' },
-        { id: 'anh-l27', number: 'Lesson 2', title: 'Language: Three-part phrasal verbs & job vocabulary' },
+        { id: 'anh-l27', number: 'Lesson 2', title: 'Language: Three-part phrasal verbs & job vocabulary', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-9-tu-vung-a165050.html' },
         { id: 'anh-l28', number: 'Lesson 3', title: 'Reading: Market trends and career choices' },
       ],
     },
@@ -743,7 +743,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
       description: 'Grammar: Reported speech (commands, requests, suggestions, advice), Learning for life',
       lessons: [
         { id: 'anh-l29', number: 'Lesson 1', title: 'Getting Started: Learning at every age' },
-        { id: 'anh-l30', number: 'Lesson 2', title: 'Language: Reported speech & lifelong learning vocabulary' },
+        { id: 'anh-l30', number: 'Lesson 2', title: 'Language: Reported speech & lifelong learning vocabulary', loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-12-global-success-unit-10-tu-vung-a165228.html' },
         { id: 'anh-l31', number: 'Lesson 3', title: 'Reading: Continuous learning in the modern world' },
       ],
     },

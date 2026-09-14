@@ -20,7 +20,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'Calculator',
     description:
       'Số hữu tỉ, số thực, góc và đường thẳng song song, tam giác, tam giác bằng nhau - đồng dạng, hình học trực quan, biểu thức đại số, thống kê và xác suất',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-toan-7-ket-noi-tri-thuc-c3352.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-toan-7-ket-noi-tri-thuc-c807.html',
     popularLessons: [
       'Số hữu tỉ và số thực',
       'Phép cộng, trừ, nhân, chia số hữu tỉ',
@@ -125,7 +125,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'BookOpen',
     description:
       'Soạn văn 7 Kết nối tri thức tập 1 & 2: truyện ngắn, thơ bốn chữ, thơ năm chữ, tục ngữ ca dao, văn nghị luận, văn bản thông tin',
-    loigiaihayUrl: 'https://loigiaihay.com/soan-van-7-ket-noi-tri-thuc-c3354.html',
+    loigiaihayUrl: 'https://loigiaihay.com/soan-van-7-ket-noi-tri-thuc-sieu-ngan-c830.html',
     popularLessons: [
       'Dòng sông khó cạn',
       'Bài học từ cây dừa',
@@ -221,7 +221,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'BookMarked',
     description:
       'Tiếng Anh 7 Kết nối tri thức: 12 unit theo chủ điểm, ngữ pháp và từ vựng trọng tâm, rèn kĩ năng đọc hiểu, nghe nói và viết',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-tieng-anh-7-ket-noi-tri-thuc-c3355.html',
+    loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-lop-7-global-success-c139.html',
     popularLessons: [
       'Unit 1: My hobbies (Sở thích của tôi)',
       'Unit 2: My house (Ngôi nhà của tôi)',
@@ -348,7 +348,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'FlaskConical',
     description:
       'KHTN 7 Kết nối tri thức: nguyên tử và nguyên tố hóa học, phân tử đơn chất hợp chất, tốc độ, âm thanh, ánh sáng, trao đổi chất ở sinh vật',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-khtn-7-ket-noi-tri-thuc-c3356.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-khoa-hoc-tu-nhien-7-ket-noi-tri-thuc-c856.html',
     popularLessons: [
       'Cấu tạo nguyên tử và bảng tuần hoàn',
       'Phân tử, đơn chất và hợp chất',
@@ -456,7 +456,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'Globe2',
     description:
       'Tích hợp Lịch sử và Địa lí 7: thế giới và Việt Nam từ thế kỉ V đến đầu thế kỉ XVI; địa lí các châu lục trên thế giới',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-lich-su-va-dia-li-7-ket-noi-tri-thuc-c3357.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-lich-su-va-dia-li-lop-7-ket-noi-tri-thuc-c829.html',
     popularLessons: [
       'Tây Âu từ thế kỉ V đến nửa đầu thế kỉ XVI',
       'Trung Quốc và Ấn Độ thời trung đại',
@@ -572,7 +572,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'HeartHandshake',
     description:
       'Giáo dục công dân 7 Kết nối tri thức: truyền thống quê hương, quan tâm cảm thông, học tập tự giác, giữ chữ tín, bảo tồn di sản, quản lí tiền',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-giao-duc-cong-dan-7-ket-noi-tri-thuc-c3358.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-giao-duc-cong-dan-7-ket-noi-tri-thuc-c924.html',
     popularLessons: [
       'Tự hào về truyền thống quê hương',
       'Quan tâm, cảm thông và chia sẻ',
@@ -688,7 +688,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'Laptop',
     description:
       'Tin học 7 Kết nối tri thức: máy tính và cộng đồng, tổ chức lưu trữ tìm kiếm trao đổi thông tin, đạo đức pháp luật môi trường số, ứng dụng tin học',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-tin-hoc-7-ket-noi-tri-thuc-c3359.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-tin-hoc-7-ket-noi-tri-thuc-c896.html',
     popularLessons: [
       'Máy tính và cộng đồng',
       'Sử dụng máy tính an toàn và hiệu quả',
@@ -770,7 +770,7 @@ export const SUBJECTS_7: SubjectInfo[] = [
     icon: 'Cpu',
     description:
       'Công nghệ 7 Kết nối tri thức: trồng trọt, lâm nghiệp, chăn nuôi, thuỷ sản - các kĩ thuật cơ bản trong sản xuất nông nghiệp',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-cong-nghe-7-ket-noi-tri-thuc-c3360.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-cong-nghe-7-ket-noi-tri-thuc-c892.html',
     popularLessons: [
       'Mở đầu về trồng trọt',
       'Làm đất trồng cây',

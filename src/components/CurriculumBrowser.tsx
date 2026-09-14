@@ -366,6 +366,19 @@ export const CurriculumBrowser: React.FC<CurriculumBrowserProps> = ({
                               <Sparkles className="w-3 h-3" />
                               <span>Soạn ngay</span>
                             </button>
+
+                            {lesson.loigiaihayUrl && (
+                              <a
+                                href={lesson.loigiaihayUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Xem từ vựng trên loigiaihay.com"
+                                className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-50 rounded-lg transition-colors"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
                           </div>
                         </div>
                       );

@@ -20,7 +20,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'Calculator',
     description:
       'Đa thức, hằng đẳng thức, phân thức, hàm số bậc nhất, tứ giác - đa giác, định lí Pythagore, hình học trực quan, xác suất - thống kê',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-toan-8-ket-noi-tri-thuc-c3322.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-toan-8-ket-noi-tri-thuc-c1390.html',
     popularLessons: [
       'Đa thức và các phép tính trên đa thức',
       'Hằng đẳng thức đáng nhớ',
@@ -133,7 +133,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'BookOpen',
     description:
       'Truyện ngắn hiện đại, thơ Đường luật, truyện cười - truyện trào phúng, văn nghị luận',
-    loigiaihayUrl: 'https://loigiaihay.com/soan-van-8-ket-noi-tri-thuc-c3323.html',
+    loigiaihayUrl: 'https://loigiaihay.com/soan-van-8-ket-noi-tri-thuc-chi-tiet-c1381.html',
     popularLessons: [
       'Soạn bài: Vượt thác',
       'Soạn bài: Quê người',
@@ -225,7 +225,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'BookMarked',
     description:
       'Tiếng Anh 8 Kết nối tri thức: 12 unit theo chủ điểm, ngữ pháp & từ vựng trọng tâm, rèn kĩ năng đọc hiểu và viết',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-tieng-anh-8-ket-noi-tri-thuc-c3324.html',
+    loigiaihayUrl: 'https://loigiaihay.com/tieng-anh-8-global-success-c1405.html',
     popularLessons: [
       'Unit 1: Leisure time (Thời gian rảnh)',
       'Unit 2: Physical activities (Hoạt động thể chất)',
@@ -357,7 +357,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'FlaskConical',
     description:
       'KHTN 8 (Kết nối tri thức): phản ứng hóa học, mol, vật lí (khối lượng riêng, áp suất, lực, điện, nhiệt), sinh học cơ thể người, sinh vật và môi trường',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-khtn-8-ket-noi-tri-thuc-c3325.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-khoa-hoc-tu-nhien-8-ket-noi-tri-thuc-c1378.html',
     popularLessons: [
       'Phản ứng hóa học và điều kiện xảy ra',
       'Hệ thức hóa học, mô và khối lượng mol',
@@ -468,7 +468,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'Globe2',
     description:
       'Tích hợp Lịch sử & Địa lí 8: Tây Âu và nước Mỹ từ nửa sau TK XVI đến TK XVIII, Đông Nam Á, Việt Nam từ đầu TK XVI đến thế kỉ XVIII, Địa lí Việt Nam',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-lich-su-va-dia-li-8-ket-noi-tri-thuc-c3326.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-lich-su-va-dia-li-lop-8-ket-noi-tri-thuc-c1604.html',
     popularLessons: [
       'Tây Âu và nước Mỹ từ nửa sau TK XVI đến TK XVIII',
       'Đông Nam Á từ nửa sau TK XVI đến TK XIX',
@@ -571,7 +571,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'HeartHandshake',
     description:
       'Giáo dục công dân 8 Kết nối tri thức: truyền thống dân tộc, tự trọng, tôn trọng lẽ phải, phòng chống bạo lực gia đình, lập kế hoạch chi tiêu, phòng chống tệ nạn xã hội',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-giao-duc-cong-dan-8-ket-noi-tri-thuc-c3327.html',
+    loigiaihayUrl: 'https://loigiaihay.com/giao-duc-cong-dan-8-ket-noi-tri-thuc-c1592.html',
     popularLessons: [
       'Tự hào về truyền thống dân tộc',
       'Lòng tự trọng',
@@ -672,7 +672,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'Laptop',
     description:
       'Tin học 8 Kết nối tri thức: máy tính và xã hội tri thức, mạng máy tính và Internet, đạo đức pháp luật và văn hóa trong môi trường số, ứng dụng tin học',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-tin-hoc-8-ket-noi-tri-thuc-c3328.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-tin-hoc-8-ket-noi-tri-thuc-c2219.html',
     popularLessons: [
       'Máy tính và xã hội tri thức',
       'Mạng máy tính và Internet',
@@ -752,7 +752,7 @@ export const SUBJECTS_8: SubjectInfo[] = [
     icon: 'Cpu',
     description:
       'Công nghệ 8 Kết nối tri thức: vẽ kĩ thuật, cơ khí, điện, đồ dùng điện gia đình, thiết kế kĩ thuật',
-    loigiaihayUrl: 'https://loigiaihay.com/sgk-cong-nghe-8-ket-noi-tri-thuc-c3329.html',
+    loigiaihayUrl: 'https://loigiaihay.com/sgk-cong-nghe-8-ket-noi-tri-thuc-c1529.html',
     popularLessons: [
       'Bản vẽ kĩ thuật và tiêu chuẩn trình bày',
       'Hình chiếu và bản vẽ chi tiết',
