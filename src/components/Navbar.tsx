@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BookOpenCheck,
   Crown,
   LogOut,
   LayoutDashboard,
+  Menu,
+  X,
+  User,
 } from 'lucide-react';
 import { GradeId } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -23,20 +26,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   onlineCount = 0,
   onHome,
 }) => {
-  const gradeLabel = `Lớp ${grade}`;
   const { user, openAuth, openVip, logout } = useAuth();
   const isVip = user?.isVip ?? false;
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const goHome = () => {
+    setMenuOpen(false);
+    onHome?.();
+  };
+
+  const gradeLabel = `Lớp ${grade}`;
+
   return (
     <header className="shrink-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-[52px] sm:h-14 flex items-center gap-2 sm:gap-3">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-[52px] sm:h-14 flex items-center gap-1 sm:gap-3">
         {/* Brand Logo */}
         <div
           id="brand-logo"
-          onClick={onHome}
+          onClick={goHome}
           className="flex items-center gap-2 cursor-pointer select-none group flex-shrink-0 min-w-0"
           title="Về bảng điều khiển"
         >
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-indigo-100 group-hover:scale-105 transition-transform duration-200 shrink-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-indigo-100 group-hover:scale-110 group-active:scale-95 transition-transform duration-200 shrink-0">
             <BookOpenCheck className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
@@ -54,20 +65,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Back to dashboard */}
+        {/* Back to dashboard (desktop) */}
         {onHome && (
           <button
-            onClick={onHome}
+            onClick={goHome}
             title="Về bảng điều khiển"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors shrink-0"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 transition-all duration-150 shrink-0"
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Bảng điều khiển</span>
+            <span>Bảng điều khiển</span>
           </button>
         )}
 
-        {/* Online Banner */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200 shrink-0">
+        {/* Online Banner (mọi màn hình) */}
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200 shrink-0">
           <span className="relative flex w-2 h-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -79,14 +90,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {/* Grade Switcher */}
-          <div className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-slate-100 border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 pl-1 pr-0.5 hidden sm:inline">
+          <div className="flex items-center gap-1 px-1 py-1 rounded-xl bg-slate-100 border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-500 pl-1 pr-0.5 hidden lg:inline">
               Lớp
             </span>
             <select
               value={grade}
               onChange={(e) => onGradeChange(e.target.value as GradeId)}
-              className="bg-white border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+              className="bg-white border border-slate-200 rounded-lg px-1 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
               title="Chọn lớp"
             >
               {(['6', '7', '8', '9', '10', '11', '12'] as GradeId[]).map((g) => (
@@ -97,10 +108,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </select>
           </div>
 
-          {/* Auth & VIP */}
+          {/* Auth & VIP (desktop) */}
           <button
             onClick={openVip}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all duration-150 shadow-sm ${
+            className={`hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all duration-150 shadow-sm hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${
               isVip
                 ? 'bg-gradient-to-tr from-amber-400 to-yellow-500 text-white hover:opacity-90'
                 : 'bg-gradient-to-tr from-amber-500 to-orange-500 text-white hover:opacity-90'
@@ -114,14 +125,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             <>
               <span
                 title={user.email}
-                className="hidden sm:block max-w-[120px] truncate px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700"
+                className="hidden md:block max-w-[120px] truncate px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700"
               >
                 {user.name || user.email.split('@')[0]}
               </span>
               <button
                 onClick={logout}
                 title="Đăng xuất"
-                className="flex items-center justify-center w-8 h-8 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                className="hidden md:flex items-center justify-center w-8 h-8 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -129,13 +140,82 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={openAuth}
-              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+              className="hidden md:block px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 hover:-translate-y-0.5 transition-all duration-150"
             >
               Đăng nhập
             </button>
           )}
+
+          {/* Hamburger (mobile) */}
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            title="Menu"
+            aria-label="Mở menu"
+            className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-slate-600 bg-slate-100 border border-slate-200 hover:bg-slate-200 active:scale-95 transition-all"
+          >
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Dropdown Menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-slate-200 bg-white shadow-xl">
+          <div className="max-w-7xl mx-auto px-3 py-2 space-y-1">
+            <button
+              onClick={goHome}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Bảng điều khiển
+            </button>
+            <button
+              onClick={openVip}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-amber-700 hover:bg-amber-50 transition-colors text-left"
+            >
+              <Crown className="w-4 h-4" />
+              {isVip ? 'Gói VIP của bạn' : 'Nâng cấp VIP'}
+            </button>
+            {user ? (
+              <>
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-600">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700">
+                    <User className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-800 truncate">
+                      {user.name || user.email.split('@')[0]}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-colors text-left"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={openAuth}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-indigo-700 hover:bg-indigo-50 transition-colors text-left"
+              >
+                <User className="w-4 h-4" />
+                Đăng nhập / Đăng ký
+              </button>
+            )}
+            <div className="px-3 pt-1.5 pb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>
+                Online:{' '}
+                <b className="text-emerald-600">{onlineCount > 0 ? onlineCount : '...'}</b>
+              </span>
+              <span className="font-semibold uppercase tracking-wide">GDPT 2018</span>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

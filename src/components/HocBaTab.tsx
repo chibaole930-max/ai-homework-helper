@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ClipboardList, Save, Trash2, Target, Info } from 'lucide-react';
+import { ClipboardList, Save, Trash2, Target, Info, History, BookOpen, PencilRuler, Route } from 'lucide-react';
 import { SubjectInfo } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { authHeaders } from '../lib/auth';
 
 interface HocBaProps {
   subjects: SubjectInfo[];
@@ -13,11 +15,23 @@ interface TargetRow {
   target: string;
 }
 
+interface HistoryLesson {
+  id: string;
+  type: 'note' | 'exercise' | 'path';
+  title: string;
+  subject: string;
+  date: string;
+  content: string;
+}
+
 const STORAGE_KEY_PREFIX = 'lop12_hocba_v1_';
 
 export const HocBaTab: React.FC<HocBaProps> = ({ subjects, grade }) => {
+  const { user } = useAuth();
   const [rows, setRows] = useState<TargetRow[]>([]);
   const [touched, setTouched] = useState(false);
+  const [history, setHistory] = useState<HistoryLesson[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const storageKey = `${STORAGE_KEY_PREFIX}${grade}`;
 
@@ -39,6 +53,35 @@ export const HocBaTab: React.FC<HocBaProps> = ({ subjects, grade }) => {
       localStorage.setItem(storageKey, JSON.stringify(rows));
     }
   }, [rows, storageKey, touched]);
+
+  // Tải lịch sử học tập (các bài đã lưu trong Vở Ghi) từ Database khi đăng nhập
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    fetch('/api/lessons', { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.lessons)) return;
+        setHistory(
+          data.lessons.map((l: any) => ({
+            id: String(l.id),
+            type: String(l.type || 'note'),
+            title: String(l.title || ''),
+            subject: String(l.subject || ''),
+            date: String(l.date || ''),
+            content: String(l.content || ''),
+          }))
+        );
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const setTarget = (subjectId: string, value: string) => {
     if (!touched) setTouched(true);
@@ -207,6 +250,71 @@ export const HocBaTab: React.FC<HocBaProps> = ({ subjects, grade }) => {
           </div>
         </div>
       )}
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+            <History className="w-4 h-4 text-indigo-600" />
+            Lịch sử học tập (đã lưu)
+          </h3>
+          {user ? (
+            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+              Đồng bộ tài khoản: {user.name || user.email}
+            </span>
+          ) : (
+            <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+              Cần đăng nhập để lưu lịch sử
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Các bài soạn, bài giải và lộ trình bạn đã lưu vào Vở Ghi sẽ hiện tại đây theo tài khoản —
+          xem lại bất cứ lúc nào dù đổi thiết bị.
+        </p>
+        {!user ? (
+          <p className="text-xs text-slate-400 py-3 text-center">
+            Đăng nhập để lịch sử học tập lưu vào Database.
+          </p>
+        ) : historyLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 rounded-xl bg-slate-100 animate-pulse" />
+            ))}
+          </div>
+        ) : history.length === 0 ? (
+          <p className="text-xs text-slate-400 py-3 text-center">
+            Chưa có bài nào. Soạn bài hoặc giải bài và lưu vào Vở Ghi để thấy chúng ở đây.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {history.map((h) => (
+              <div
+                key={h.id}
+                className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                  {h.type === 'exercise' ? (
+                    <PencilRuler className="w-4 h-4" />
+                  ) : h.type === 'path' ? (
+                    <Route className="w-4 h-4" />
+                  ) : (
+                    <BookOpen className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-800 truncate">{h.title}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {h.subject} · {h.date}
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shrink-0">
+                  {h.type === 'exercise' ? 'Giải' : h.type === 'path' ? 'Lộ trình' : 'Soạn'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from 'react';
 import { getToken, setToken, authHeaders, UserInfo } from '../lib/auth';
+import { registerServiceWorker, subscribePush, unsubscribePush } from '../lib/push';
 
 interface AuthContextValue {
   user: UserInfo | null;
@@ -29,6 +30,33 @@ export const useAuth = (): AuthContextValue => {
     throw new Error('useAuth phải dùng trong <AuthProvider>');
   }
   return ctx;
+};
+
+// Sau khi đăng nhập xong -> đăng ký service worker + xin quyền push một lần.
+const setupPushAfterLogin = () => {
+  registerServiceWorker()
+    .then((ok) => {
+      if (!ok) return;
+      const key = 'lop12_push_prompted_v1';
+      if (Notification.permission === 'granted') {
+        subscribePush().catch(() => {});
+      } else if (Notification.permission !== 'denied' && !localStorage.getItem(key)) {
+        localStorage.setItem(key, '1');
+        // Hỏi quyền khi người dùng ấn nút tương tác đầu tiên để tỉ lệ đồng ý cao hơn
+        const ask = () => {
+          if (Notification.permission === 'default') {
+            Notification.requestPermission()
+              .then((result) => {
+                if (result === 'granted') subscribePush().catch(() => {});
+              })
+              .catch(() => {});
+          }
+          window.removeEventListener('click', ask, true);
+        };
+        window.addEventListener('click', ask, true);
+      }
+    })
+    .catch(() => {});
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -71,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setToken(data.token);
       setUser(data.user);
       setAuthOpen(false);
+      setupPushAfterLogin();
       return null;
     } catch {
       return 'Không kết nối được máy chủ. Vui lòng thử lại.';
@@ -90,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setToken(data.token);
         setUser(data.user);
         setAuthOpen(false);
+        setupPushAfterLogin();
         return null;
       } catch {
         return 'Không kết nối được máy chủ. Vui lòng thử lại.';
@@ -108,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setToken(null);
     setUser(null);
+    unsubscribePush();
   }, []);
 
   const redeem = useCallback(async (code: string) => {

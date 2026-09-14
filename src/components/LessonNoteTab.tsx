@@ -29,6 +29,7 @@ import {
   RefreshCw,
   Sliders,
   ChevronRight,
+  ChevronDown,
   AlertCircle,
   ExternalLink,
   Layers,
@@ -280,8 +281,44 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const alreadySaved = isItemSaved(lessonTitle.trim(), currentSubject.name);
   const outOfUses = usage !== null && !usage.isVip && usage.remaining <= 0;
 
+  // Mobile accordion: bấm tiêu đề bước để mở/đóng trên điện thoại, desktop luôn mở
+  const [mobileOpen, setMobileOpen] = useState<number | null>(1);
+  const toggleStep = (step: number) =>
+    setMobileOpen((prev) => (prev === step ? null : step));
+  // Nội dung bước: mobile chỉ hiện khi accordion mở, desktop luôn hiện (lg:block)
+  const stepBodyCls = (step: number) =>
+    mobileOpen === step ? 'block' : 'hidden lg:block';
+
+  const renderStepHeader = (
+    step: number,
+    title: string,
+    badge?: string,
+    onToggle?: () => void
+  ) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="lg:cursor-default flex items-center justify-between gap-2 w-full lg:w-auto"
+    >
+      <span className="flex items-center gap-2">
+        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+          {step}
+        </span>
+        {title}
+      </span>
+      {badge && (
+        <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+
+  // Thêm padding đáy khi có bài soạn để sticky bar không che nội dung
+  const rootCls = 'space-y-6' + (generatedNote ? ' pb-24' : '');
+
   return (
-    <div className="space-y-6">
+    <div className={rootCls}>
       {/* Introduction Banner */}
       <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
@@ -344,17 +381,25 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           {/* 1. Chọn Môn Học */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleStep(1)}
+                className="lg:cursor-default flex items-center gap-2 text-left flex-1"
+              >
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
                   1
                 </span>
-                Bước 1 • Chọn Môn Học {gradeLabel}
-              </label>
+                <span className="text-sm font-bold text-slate-800">
+                  Bước 1 • Chọn Môn Học {gradeLabel}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 lg:hidden transition-transform ${mobileOpen === 1 ? 'rotate-180' : ''}`} />
+              </button>
               <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
                 11 Môn học
               </span>
             </div>
 
+            <div className={stepBodyCls(1)}>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {subjects.map((subject) => {
                 const isSelected = subject.id === selectedSubjectId;
@@ -401,6 +446,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
+            </div>
             </div>
           </div>
 
@@ -520,17 +566,23 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
 
           {/* Bước 2: Chọn bài học theo mục lục */}
           <div className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-              2
-            </span>
-            <label className="text-sm font-bold text-slate-800">
-              Bước 2 • Chọn Bài Học
-            </label>
+            <button
+              type="button"
+              onClick={() => toggleStep(2)}
+              className="lg:cursor-default flex items-center gap-2 text-left flex-1"
+            >
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+                2
+              </span>
+              <span className="text-sm font-bold text-slate-800">Bước 2 • Chọn Bài Học</span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 lg:hidden transition-transform ${mobileOpen === 2 ? 'rotate-180' : ''}`} />
+            </button>
             <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md ml-auto">
               {currentSubject.name}
             </span>
           </div>
           {/* Liệt kê các Phần & Bài học SGK (Chuẩn loigiaihay.com) */}
+          <div className={stepBodyCls(2)}>
           <CurriculumBrowser
             chapters={currentSubject.chapters || []}
             selectedSubject={currentSubject}
@@ -539,21 +591,28 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             onSelectLesson={handleSelectLesson}
             isLoading={isLoading}
           />
+          </div>
 
           {/* 4. Phong Cách Soạn Bài & Mức Độ */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleStep(3)}
+                className="lg:cursor-default flex items-center gap-2 text-left flex-1"
+              >
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
                   3
                 </span>
-                Bước 3 • Chọn Kiểu Bài Soạn
-              </label>
+                <span className="text-sm font-bold text-slate-800">Bước 3 • Chọn Kiểu Bài Soạn</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 lg:hidden transition-transform ${mobileOpen === 3 ? 'rotate-180' : ''}`} />
+              </button>
               <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
                 Chuẩn loigiaihay.com
               </span>
             </div>
 
+            <div className={stepBodyCls(3)}>
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
@@ -707,6 +766,7 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                 </>
               )}
             </button>
+            </div>
           </div>
         </div>
 
@@ -851,6 +911,62 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Sticky bottom bar: Lưu / Sao chép / In / Soạn tiếp (hiện khi đã có bài soạn) */}
+      {generatedNote && (
+        <div className="fixed bottom-0 inset-x-0 z-40 px-3 pb-3 pointer-events-none">
+          <div className="max-w-7xl mx-auto bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 p-2.5 flex items-center gap-2 pointer-events-auto flex-wrap">
+            <button
+              onClick={handleSave}
+              disabled={alreadySaved}
+              className={`flex-1 min-w-[120px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+                alreadySaved
+                  ? 'bg-emerald-100 text-emerald-700 cursor-default'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-100 active:scale-[0.98]'
+              }`}
+            >
+              {alreadySaved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Đã lưu
+                </>
+              ) : (
+                <>
+                  <Bookmark className="w-4 h-4" />
+                  Lưu vào Vở Ghi
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1.5"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              <span className="hidden sm:inline">{copied ? 'Đã chép' : 'Sao chép'}</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              title="In bài ghi"
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center justify-center"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                setGeneratedNote('');
+                setIsEditing(false);
+                setCopied(false);
+                if (outputRef.current) outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }}
+              title="Soạn bài học khác"
+              className="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white border-2 border-slate-900/10 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Soạn tiếp
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Đăng bài mẫu lên Kho chung */}
       {showShareModal && (

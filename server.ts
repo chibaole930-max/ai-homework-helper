@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import webpush from "web-push";
 import { Pool } from "pg";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
@@ -1236,6 +1237,52 @@ async function ensureUsageTable(pool: Pool) {
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_lessons (
+      id TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'note',
+      title TEXT NOT NULL,
+      subject TEXT NOT NULL DEFAULT '',
+      "subjectId" TEXT NOT NULL DEFAULT '',
+      textbook TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL,
+      date TEXT NOT NULL DEFAULT '',
+      "isFavorite" BOOLEAN NOT NULL DEFAULT false,
+      style TEXT,
+      "originalProblem" TEXT,
+      grade TEXT,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // Đồng bộ các bài học JSON cũ sang PostgreSQL nếu đang chạy với DB (một lần)
+  try {
+    const { rows } = await pool.query('SELECT COUNT(*) as c FROM user_lessons');
+    if (Number(rows[0].c) === 0) {
+      const legacy = readUserLessonsSync();
+      if (legacy.length > 0) {
+        for (const l of legacy) {
+          await pool.query(
+            `INSERT INTO user_lessons (id, "userId", type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, "originalProblem", grade)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             ON CONFLICT (id) DO NOTHING`,
+            [l.id, l.userId, l.type, l.title, l.subject, l.subjectId, l.textbook, l.content, l.date, l.isFavorite, l.style || null, l.originalProblem || null, l.grade || null]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Lessons] Không đồng bộ được JSON sang PostgreSQL:", err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1397,6 +1444,208 @@ async function isVip(user: UserRecord): Promise<boolean> {
   const until = new Date(user.vipUntil);
   if (until.getTime() <= Date.now()) return false;
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// BÀI HỌC ĐÃ LƯU CỦA NGƯỜI DÙNG (Vở Ghi đồng bộ theo tài khoản)
+// - Mỗi bài soạn / bài giải / lộ trình đều được lưu gắn với userId.
+// - Lưu PostgreSQL (bảng user_lessons) hoặc file JSON fallback key theo userId.
+// ---------------------------------------------------------------------------
+
+const USER_LESSONS_FILE = path.join(process.cwd(), "data", "user-lessons.json");
+
+export interface UserLesson {
+  id: string;
+  userId: string;
+  type: "note" | "exercise" | "path";
+  title: string;
+  subject: string;
+  subjectId: string;
+  textbook: string;
+  content: string;
+  date: string;
+  isFavorite: boolean;
+  style?: string;
+  originalProblem?: string;
+  grade?: string;
+  createdAt: string;
+}
+
+function readUserLessonsSync(): UserLesson[] {
+  if (fs.existsSync(USER_LESSONS_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(USER_LESSONS_FILE, "utf-8"));
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+}
+
+async function readUserLessons(userId?: string): Promise<UserLesson[]> {
+  if (pgPool) {
+    try {
+      const q = userId
+        ? `SELECT * FROM user_lessons WHERE "userId" = $1 ORDER BY "createdAt" DESC`
+        : `SELECT * FROM user_lessons ORDER BY "createdAt" DESC`;
+      const params = userId ? [userId] : [];
+      const { rows } = await pgPool.query(q, params);
+      return rows.map((r) => ({
+        id: String(r.id),
+        userId: String(r.userId),
+        type: String(r.type) as UserLesson["type"],
+        title: String(r.title),
+        subject: String(r.subject),
+        subjectId: String(r.subjectId),
+        textbook: String(r.textbook),
+        content: String(r.content),
+        date: String(r.date),
+        isFavorite: !!r.isFavorite,
+        style: r.style ? String(r.style) : undefined,
+        originalProblem: r.originalProblem ? String(r.originalProblem) : undefined,
+        grade: r.grade ? String(r.grade) : undefined,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      }));
+    } catch (err) {
+      console.warn("[Lessons] Không đọc được PostgreSQL:", err);
+    }
+  }
+  const list = readUserLessonsSync();
+  return userId ? list.filter((l) => l.userId === userId) : list;
+}
+
+async function writeUserLessons(list: UserLesson[]) {
+  if (pgPool) {
+    try {
+      await pgPool.query("DELETE FROM user_lessons");
+      for (const l of list) {
+        await pgPool.query(
+          `INSERT INTO user_lessons (id, "userId", type, title, subject, "subjectId", textbook, content, date, "isFavorite", style, "originalProblem", grade)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [l.id, l.userId, l.type, l.title, l.subject, l.subjectId, l.textbook, l.content, l.date, l.isFavorite, l.style || null, l.originalProblem || null, l.grade || null]
+        );
+      }
+      return;
+    } catch (err) {
+      console.warn("[Lessons] Lỗi ghi PostgreSQL:", err);
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(USER_LESSONS_FILE), { recursive: true });
+    fs.writeFileSync(USER_LESSONS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Lessons] Không lưu được file:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PUSH NOTIFICATION (Web Push API chuẩn - không phụ thuộc bên thứ ba)
+// - VAPID keys có thể cấu hình qua env; nếu chưa có sẽ tự sinh và lưu file.
+// - Subscriptions lưu trong PostgreSQL (bảng push_subscriptions) hoặc JSON.
+// - Cron gửi định kỳ theo cấu hình notifications trong site settings.
+// ---------------------------------------------------------------------------
+
+const PUSH_SUBS_FILE = path.join(process.cwd(), "data", "push-subscriptions.json");
+const VAPID_KEYS_FILE = path.join(process.cwd(), "data", "vapid-keys.json");
+
+interface PushSubscription {
+  userId: string;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  createdAt: string;
+}
+
+function loadVapidKeys(): { publicKey: string; privateKey: string } {
+  const envPublic = process.env.VAPID_PUBLIC_KEY;
+  const envPrivate = process.env.VAPID_PRIVATE_KEY;
+  if (envPublic && envPrivate) return { publicKey: envPublic, privateKey: envPrivate };
+  try {
+    if (fs.existsSync(VAPID_KEYS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(VAPID_KEYS_FILE, "utf-8"));
+      if (parsed.publicKey && parsed.privateKey) {
+        return { publicKey: parsed.publicKey, privateKey: parsed.privateKey };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  const generated = webpush.generateVAPIDKeys();
+  try {
+    fs.mkdirSync(path.dirname(VAPID_KEYS_FILE), { recursive: true });
+    fs.writeFileSync(VAPID_KEYS_FILE, JSON.stringify(generated, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Push] Không lưu được VAPID keys:", err);
+  }
+  return { publicKey: generated.publicKey, privateKey: generated.privateKey };
+}
+
+const rapidKeys = loadVapidKeys();
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+
+function initWebPush() {
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, rapidKeys.publicKey, rapidKeys.privateKey);
+  } catch (err) {
+    console.warn("[Push] Lỗi khởi tạo web-push:", err);
+  }
+}
+
+function readPushSubscriptionsSync(): PushSubscription[] {
+  if (fs.existsSync(PUSH_SUBS_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(PUSH_SUBS_FILE, "utf-8"));
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+}
+
+async function readPushSubscriptions(userId?: string): Promise<PushSubscription[]> {
+  if (pgPool) {
+    try {
+      const q = userId
+        ? `SELECT * FROM push_subscriptions WHERE "userId" = $1`
+        : `SELECT * FROM push_subscriptions`;
+      const { rows } = await pgPool.query(q, userId ? [userId] : []);
+      return rows.map((r) => ({
+        userId: String(r.userId),
+        endpoint: String(r.endpoint),
+        keys: { p256dh: String(r.p256dh), auth: String(r.auth) },
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      }));
+    } catch (err) {
+      console.warn("[Push] Không đọc được PostgreSQL:", err);
+    }
+  }
+  const list = readPushSubscriptionsSync();
+  return userId ? list.filter((s) => s.userId === userId) : list;
+}
+
+async function writePushSubscriptions(list: PushSubscription[]) {
+  if (pgPool) {
+    try {
+      await pgPool.query("DELETE FROM push_subscriptions");
+      for (const s of list) {
+        await pgPool.query(
+          `INSERT INTO push_subscriptions (endpoint, "userId", p256dh, auth)
+           VALUES ($1,$2,$3,$4)`,
+          [s.endpoint, s.userId, s.keys.p256dh, s.keys.auth]
+        );
+      }
+      return;
+    } catch (err) {
+      console.warn("[Push] Lỗi ghi PostgreSQL:", err);
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(PUSH_SUBS_FILE), { recursive: true });
+    fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Push] Không lưu được subscriptions:", err);
+  }
 }
 
 async function readLicenseKeys(): Promise<LicenseKeyRecord[]> {
@@ -1752,6 +2001,12 @@ interface SiteSettings {
   donate: { enabled: boolean; qrImage: string; note: string };
   ai: { geminiKey: string; keys: AiKeyConfig[] };
   freeUsageLimit: number;
+  notifications: {
+    enabled: boolean;
+    intervalHours: number;
+    title: string;
+    body: string;
+  };
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -1760,7 +2015,23 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
   donate: { enabled: false, qrImage: "", note: "" },
   ai: { geminiKey: "", keys: [] },
   freeUsageLimit: 2,
+  notifications: {
+    enabled: false,
+    intervalHours: 2,
+    title: "Học Tập - Nhắc nhở hôm nay",
+    body: "Đã đến giờ học! Mở app để soạn bài hoặc giải bài tập nhé.",
+  },
 };
+
+function normalizeNotifications(n: any): SiteSettings["notifications"] {
+  const interval = Math.floor(Number(n?.intervalHours));
+  return {
+    enabled: !!n?.enabled,
+    intervalHours: interval >= 1 && interval <= 48 ? interval : 2,
+    title: String(n?.title || DEFAULT_SITE_SETTINGS.notifications.title).slice(0, 120),
+    body: String(n?.body || DEFAULT_SITE_SETTINGS.notifications.body).slice(0, 500),
+  };
+}
 
 function normalizeFreeAiLimit(n: any): number {
   const v = Math.floor(Number(n));
@@ -1858,6 +2129,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
           },
           ai: normalizeAiConfig(parsed.ai),
           freeUsageLimit: normalizeFreeAiLimit(parsed.freeUsageLimit),
+          notifications: normalizeNotifications(parsed.notifications),
         };
         return cachedSiteSettings;
       }
@@ -1885,6 +2157,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
           },
           ai: normalizeAiConfig(parsed.ai),
           freeUsageLimit: normalizeFreeAiLimit(parsed.freeUsageLimit),
+          notifications: normalizeNotifications(parsed.notifications),
         };
       return cachedSiteSettings;
     }
@@ -1897,6 +2170,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
     donate: { enabled: false, qrImage: "", note: "" },
     ai: { geminiKey: "", keys: [] },
     freeUsageLimit: 2,
+    notifications: DEFAULT_SITE_SETTINGS.notifications,
   };
   return cachedSiteSettings;
 }
@@ -1972,9 +2246,64 @@ if (pgPool) {
   });
 }
 
+// Gửi push tới toàn bộ subscriptions (broadcast). Trả về số gửi thành công.
+async function sendPushToAll(title: string, body: string): Promise<number> {
+  const subs = await readPushSubscriptions();
+  if (subs.length === 0) return 0;
+  const payload = JSON.stringify({ title, body, url: "/" });
+  let okCount = 0;
+  const remaining: PushSubscription[] = [];
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+        },
+        payload
+      );
+      okCount++;
+      remaining.push(sub);
+    } catch (err: any) {
+      const status = err?.statusCode;
+      // 404/410: endpoint cũ không còn hợp lệ -> xóa khỏi danh sách
+      if (status === 404 || status === 410) {
+        console.warn("[Push] Xóa subscription không còn hợp lệ:", status);
+      } else {
+        remaining.push(sub);
+      }
+    }
+  }
+  if (remaining.length !== subs.length) await writePushSubscriptions(remaining);
+  return okCount;
+}
+
+// Kiểm tra + gửi push định kỳ theo cấu hình (intervalHours) của admin.
+let lastPushSentAt = 0;
+async function maybeSendScheduledPush() {
+  try {
+    const settings = await readSiteSettings();
+    const cfg = settings.notifications;
+    if (!cfg.enabled || !cfg.title || !cfg.body) return;
+    const intervalMs = Math.max(1, cfg.intervalHours) * 60 * 60 * 1000;
+    if (Date.now() - lastPushSentAt < intervalMs) return;
+    const ok = await sendPushToAll(cfg.title, cfg.body);
+    if (ok > 0) {
+      lastPushSentAt = Date.now();
+      console.log(`[Push] Đã gửi thông báo định kỳ tới ${ok} thiết bị.`);
+    }
+  } catch (err) {
+    console.warn("[Push] Lỗi gửi push định kỳ:", err);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  initWebPush();
+  // Cron gửi push định kỳ (kiểm tra mỗi phút, tự theo intervalHours)
+  setInterval(() => { maybeSendScheduledPush().catch(() => {}); }, 60 * 1000);
 
   // Nền tảng đo số người online theo mốc thời gian (admin)
   loadOnlineHistory();
@@ -2133,45 +2462,46 @@ async function startServer() {
         });
       }
 
-      const next: SiteSettings = {
-        maintenance: {
-          enabled:
-            maintenance?.enabled === undefined
-              ? current.maintenance.enabled
-              : !!maintenance.enabled,
-          message: String(maintenance?.message ?? current.maintenance.message).slice(0, 500),
-          modules:
-            maintenance?.modules === undefined
-              ? current.maintenance.modules
-              : normalizeMaintenanceModules(maintenance?.modules),
-        },
-        announcement: {
-          enabled:
-            announcement?.enabled === undefined
-              ? current.announcement.enabled
-              : !!announcement.enabled,
-          text: String(announcement?.text ?? current.announcement.text).slice(0, 2000),
-        },
-        donate: {
-          enabled:
-            donate?.enabled === undefined ? current.donate.enabled : !!donate.enabled,
-          qrImage:
-            rawQr && (rawQr.startsWith("data:image/") || rawQr.startsWith("https://") || rawQr.startsWith("/"))
-              ? rawQr.slice(0, 3000000)
-              : "",
-          note: String(donate?.note ?? current.donate.note).slice(0, 500),
-        },
-        ai: {
-          geminiKey: aiKeys
-            .filter((k) => k.enabled)
-            .map((k) => k.key)
-            .join("\n"),
-          keys: aiKeys,
-        },
-        freeUsageLimit: normalizeFreeAiLimit(req.body?.freeUsageLimit ?? current.freeUsageLimit),
-      };
-      await writeSiteSettings(next);
-      res.json(next);
+const next: SiteSettings = {
+          maintenance: {
+            enabled:
+              maintenance?.enabled === undefined
+                ? current.maintenance.enabled
+                : !!maintenance.enabled,
+            message: String(maintenance?.message ?? current.maintenance.message).slice(0, 500),
+            modules:
+              maintenance?.modules === undefined
+                ? current.maintenance.modules
+                : normalizeMaintenanceModules(maintenance?.modules),
+          },
+          announcement: {
+            enabled:
+              announcement?.enabled === undefined
+                ? current.announcement.enabled
+                : !!announcement.enabled,
+            text: String(announcement?.text ?? current.announcement.text).slice(0, 2000),
+          },
+          donate: {
+            enabled:
+              donate?.enabled === undefined ? current.donate.enabled : !!donate.enabled,
+            qrImage:
+              rawQr && (rawQr.startsWith("data:image/") || rawQr.startsWith("https://") || rawQr.startsWith("/"))
+                ? rawQr.slice(0, 3000000)
+                : "",
+            note: String(donate?.note ?? current.donate.note).slice(0, 500),
+          },
+          ai: {
+            geminiKey: aiKeys
+              .filter((k) => k.enabled)
+              .map((k) => k.key)
+              .join("\n"),
+            keys: aiKeys,
+          },
+          freeUsageLimit: normalizeFreeAiLimit(req.body?.freeUsageLimit ?? current.freeUsageLimit),
+          notifications: normalizeNotifications(req.body?.notifications ?? current.notifications),
+        };
+        await writeSiteSettings(next);
+        res.json(next);
     } catch (err: any) {
       console.error("Admin update failed:", err);
       res.status(500).json({ error: "Không lưu được cài đặt." });
@@ -3159,6 +3489,149 @@ Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
     } catch (err: any) {
       console.error("Error viewing community preset:", err);
       res.status(500).json({ error: "Không cập nhật được lượt xem." });
+    }
+  });
+
+  // API: VAPID public key cho push notification (public)
+  app.get("/api/push/vapid-key", (_req, res) => {
+    res.json({ publicKey: rapidKeys.publicKey });
+  });
+
+  // API: Đăng ký subscription push cho tài khoản hiện tại
+  app.post("/api/push/subscribe", requireUser, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const endpoint = String(req.body?.endpoint || "").trim();
+      const p256dh = String(req.body?.keys?.p256dh || "").trim();
+      const auth = String(req.body?.keys?.auth || "").trim();
+      if (!endpoint || !p256dh || !auth) {
+        return res.status(400).json({ error: "Thiếu thông tin subscription." });
+      }
+      const list = await readPushSubscriptions();
+      const filtered = list.filter((s) => s.endpoint !== endpoint);
+      filtered.unshift({ userId, endpoint, keys: { p256dh, auth }, createdAt: new Date().toISOString() });
+      await writePushSubscriptions(filtered);
+      res.json({ ok: true, subscribed: true });
+    } catch (err: any) {
+      console.error("Push subscribe error:", err);
+      res.status(500).json({ error: "Không đăng ký được thông báo." });
+    }
+  });
+
+  // API: Hủy đăng ký push notification
+  app.post("/api/push/unsubscribe", requireUser, async (req, res) => {
+    try {
+      const endpoint = String(req.body?.endpoint || "").trim();
+      const list = await readPushSubscriptions();
+      const filtered = list.filter((s) => s.endpoint !== endpoint);
+      await writePushSubscriptions(filtered);
+      res.json({ ok: true, subscribed: false });
+    } catch (err: any) {
+      res.status(500).json({ error: "Không hủy được đăng ký." });
+    }
+  });
+
+  // API: Gửi thử thông báo ngay (admin)
+  app.post("/api/admin/push/test", requireAdmin, async (req, res) => {
+    try {
+      const settings = await readSiteSettings();
+      const cfg = settings.notifications;
+      const ok = await sendPushToAll(cfg.title, cfg.body);
+      res.json({ ok: true, sent: ok });
+    } catch (err: any) {
+      console.error("Push test error:", err);
+      res.status(500).json({ error: "Không gửi được thông báo thử." });
+    }
+  });
+
+  // API: Danh sách bài đã lưu của user (Vở Ghi đồng bộ theo tài khoản)
+  app.get("/api/lessons", requireUser, async (req, res) => {
+    try {
+      const lessons = await readUserLessons((req as any).userId);
+      res.json({ lessons });
+    } catch (err: any) {
+      console.error("Error reading lessons:", err);
+      res.status(500).json({ error: "Không đọc được bài đã lưu." });
+    }
+  });
+
+  // API: Lưu một bài học (soạn bài / giải bài / lộ trình) cho user
+  app.post("/api/lessons", requireUser, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const body = req.body || {};
+      const type = body.type === "exercise" || body.type === "path" ? body.type : "note";
+      const title = String(body.title || "").trim().slice(0, 200);
+      if (!title) return res.status(400).json({ error: "Thiếu tên bài học." });
+      const content = String(body.content || "").slice(0, 50000);
+      if (!content) return res.status(400).json({ error: "Thiếu nội dung bài học." });
+
+      const lesson: UserLesson = {
+        id: "l-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+        userId,
+        type,
+        title,
+        subject: String(body.subject || "").trim(),
+        subjectId: String(body.subjectId || "").trim(),
+        textbook: String(body.textbook || "").trim(),
+        content,
+        date: body.date || new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }),
+        isFavorite: !!body.isFavorite,
+        style: body.style ? String(body.style) : undefined,
+        originalProblem: body.originalProblem ? String(body.originalProblem) : undefined,
+        grade: body.grade ? String(body.grade) : undefined,
+        createdAt: new Date().toISOString(),
+      };
+      const list = await readUserLessons();
+      list.unshift(lesson);
+      await writeUserLessons(list);
+      res.status(201).json({ lesson });
+    } catch (err: any) {
+      console.error("Error saving lesson:", err);
+      res.status(500).json({ error: "Không lưu được bài học." });
+    }
+  });
+
+  // API: Xóa toàn bộ bài học của user (dọn Vở Ghi)
+  app.delete("/api/lessons", requireUser, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const list = await readUserLessons();
+      const filtered = list.filter((l) => l.userId !== userId);
+      await writeUserLessons(filtered);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: "Không xóa được bài học." });
+    }
+  });
+
+  // API: Xóa một bài học của user
+  app.delete("/api/lessons/:id", requireUser, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const id = req.params.id;
+      const list = await readUserLessons();
+      const filtered = list.filter((l) => !(l.id === id && l.userId === userId));
+      await writeUserLessons(filtered);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: "Không xóa được bài học." });
+    }
+  });
+
+  // API: Đổi trạng thái yêu thích một bài học
+  app.post("/api/lessons/:id/toggle-favorite", requireUser, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const id = req.params.id;
+      const list = await readUserLessons();
+      const target = list.find((l) => l.id === id && l.userId === userId);
+      if (!target) return res.status(404).json({ error: "Không tìm thấy bài học." });
+      target.isFavorite = !target.isFavorite;
+      await writeUserLessons(list);
+      res.json({ ok: true, isFavorite: target.isFavorite });
+    } catch (err: any) {
+      res.status(500).json({ error: "Không cập nhật được bài học." });
     }
   });
 

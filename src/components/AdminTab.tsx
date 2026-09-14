@@ -33,6 +33,8 @@ import {
   HeartPulse,
   Settings,
   Activity,
+  Bell,
+  Send,
 } from 'lucide-react';
 
 interface AiKeyConfig {
@@ -53,6 +55,12 @@ interface SiteSettings {
   donate: { enabled: boolean; qrImage: string; note: string };
   ai: { geminiKey: string; keys: AiKeyConfig[] };
   freeUsageLimit?: number;
+  notifications?: {
+    enabled: boolean;
+    intervalHours: number;
+    title: string;
+    body: string;
+  };
 }
 
 interface StatsOverview {
@@ -187,6 +195,8 @@ interface PendingPresetItem {
 }
 
 const TOKEN_KEY = 'admin_token';
+const DEFAULT_PUSH_TITLE = 'Học Tập - Nhắc nhở hôm nay';
+const DEFAULT_PUSH_BODY = 'Đã đến giờ học! Mở app để soạn bài hoặc giải bài tập nhé.';
 
 export default function AdminTab() {
   const [token, setToken] = useState<string>(
@@ -196,6 +206,9 @@ export default function AdminTab() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
+
+  const [pushTesting, setPushTesting] = useState(false);
+  const [pushTestResult, setPushTestResult] = useState<number | null>(null);
 
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -657,6 +670,25 @@ export default function AdminTab() {
     }
   };
 
+  const sendTestPush = async () => {
+    if (!settings || pushTesting) return;
+    setPushTesting(true);
+    setPushTestResult(null);
+    try {
+      const res = await fetch('/api/admin/push/test', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không gửi thử được.');
+      setPushTestResult(data.sent ?? 0);
+    } catch (err: any) {
+      setSaveMsg({ ok: false, text: err.message || 'Không gửi thử được.' });
+    } finally {
+      setPushTesting(false);
+    }
+  };
+
   const handleLogout = () => {
     fetch('/api/admin/logout', {
       method: 'POST',
@@ -1079,6 +1111,156 @@ export default function AdminTab() {
           <span>
             Khi bật và có ảnh QR, web sẽ <b className="text-rose-500">tự động hiện popup</b>{' '}
             ủng hộ khi học sinh vào web (1 lần/mỗi phiên truy cập).
+          </span>
+        </div>
+      </div>
+
+      {/* Thông báo đẩy (Push Notification) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2.5">
+          <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 text-amber-600">
+            <Bell className="w-4.5 h-4.5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-800">Thông báo đẩy (Push)</h2>
+            <p className="text-[11px] text-slate-500">
+              Gửi tin nhắn định kỳ tới thiết bị học sinh đã cho phép (Web Push chuẩn, miễn phí).
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-bold text-slate-700">Bật thông báo định kỳ</p>
+            <p className="text-[11px] text-slate-500">
+              Hệ thống tự nhắc học sinh học theo chu kỳ đã cài.
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings?.notifications?.enabled || false}
+              onChange={(e) =>
+                setSettings((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        notifications: {
+                          enabled: e.target.checked,
+                          intervalHours: prev.notifications?.intervalHours ?? 2,
+                          title: prev.notifications?.title ?? DEFAULT_PUSH_TITLE,
+                          body: prev.notifications?.body ?? DEFAULT_PUSH_BODY,
+                        },
+                      }
+                    : prev
+                )
+              }
+              className="sr-only peer"
+            />
+            <div className="w-10 h-6 rounded-full bg-slate-200 peer-checked:bg-amber-500 peer-checked:peer-focus:ring-amber-300 peer-focus:ring-2 peer-focus:ring-amber-200 transition-colors before:content-[''] before:absolute before:left-0.5 before:top-0.5 before:w-5 before:h-5 before:bg-white before:rounded-full before:shadow before:transition-transform peer-checked:before:translate-x-4" />
+          </label>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1 block">
+            Tần suất gửi
+          </label>
+          <select
+            value={settings?.notifications?.intervalHours ?? 2}
+            onChange={(e) =>
+              setSettings((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      notifications: {
+                        enabled: prev.notifications?.enabled ?? false,
+                        intervalHours: Number(e.target.value),
+                        title: prev.notifications?.title ?? DEFAULT_PUSH_TITLE,
+                        body: prev.notifications?.body ?? DEFAULT_PUSH_BODY,
+                      },
+                    }
+                  : prev
+              )
+            }
+            className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none bg-white"
+          >
+            <option value={1}>Mỗi 1 giờ</option>
+            <option value={2}>Mỗi 2 giờ (mặc định)</option>
+            <option value={3}>Mỗi 3 giờ</option>
+            <option value={6}>Mỗi 6 giờ</option>
+            <option value={12}>Mỗi 12 giờ</option>
+            <option value={24}>Mỗi 24 giờ</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1 block">Tiêu đề</label>
+          <input
+            value={settings?.notifications?.title ?? DEFAULT_PUSH_TITLE}
+            onChange={(e) =>
+              setSettings((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      notifications: {
+                        enabled: prev.notifications?.enabled ?? false,
+                        intervalHours: prev.notifications?.intervalHours ?? 2,
+                        title: e.target.value,
+                        body: prev.notifications?.body ?? DEFAULT_PUSH_BODY,
+                      },
+                    }
+                  : prev
+              )
+            }
+            maxLength={120}
+            placeholder="Tiêu đề thông báo"
+            className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1 block">Nội dung</label>
+          <textarea
+            value={settings?.notifications?.body ?? DEFAULT_PUSH_BODY}
+            onChange={(e) =>
+              setSettings((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      notifications: {
+                        enabled: prev.notifications?.enabled ?? false,
+                        intervalHours: prev.notifications?.intervalHours ?? 2,
+                        title: prev.notifications?.title ?? DEFAULT_PUSH_TITLE,
+                        body: e.target.value,
+                      },
+                    }
+                  : prev
+              )
+            }
+            rows={3}
+            maxLength={500}
+            placeholder="Nội dung thông báo"
+            className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={sendTestPush}
+            disabled={pushTesting}
+            className="px-3 py-2 text-[11px] font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+          >
+            <Send className={`w-3.5 h-3.5 ${pushTesting ? 'animate-pulse' : ''}`} />
+            {pushTesting ? 'Đang gửi thử...' : 'Gửi thử ngay'}
+          </button>
+          {pushTestResult !== null && (
+            <span className="text-[11px] font-bold text-slate-600">
+              Đã gửi thử tới {pushTestResult} thiết bị.
+            </span>
+          )}
+          <span className="text-[11px] text-slate-400">
+            Học sinh chỉ nhận khi đã bấm "Cho phép" trên trình duyệt.
           </span>
         </div>
       </div>

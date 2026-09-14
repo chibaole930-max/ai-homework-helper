@@ -27,10 +27,13 @@ import {
   RefreshCw,
   AlertCircle,
   Lightbulb,
+  ListOrdered,
+  ChevronDown,
   FileQuestion,
   ChevronRight,
   ArrowRight,
   ExternalLink,
+  CheckCircle2,
   Crown,
 } from 'lucide-react';
 
@@ -261,8 +264,29 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
     : `Bài tập ${currentSubject.shortName}`;
   const alreadySaved = isItemSaved(titleSnippet, currentSubject.name);
 
+  // Mobile accordion cho từng bước (desktop luôn mở)
+  const [mobileOpen, setMobileOpen] = useState<number | null>(1);
+  const toggleStep = (step: number) =>
+    setMobileOpen((prev) => (prev === step ? null : step));
+  const stepBodyCls = (step: number) =>
+    mobileOpen === step ? 'block' : 'hidden lg:block';
+
+  // Tiến trình giải bài dùng cho progress bar và bước nhảy
+  const progressStep = solution ? 3 : isLoading ? 2 : problemText.trim() ? 1 : 0;
+  const progressPct = progressStep === 0 ? 8 : progressStep === 1 ? 40 : progressStep === 2 ? 70 : 100;
+  const progressLabel =
+    progressStep === 0
+      ? 'Bước 1: Nhập đề bài'
+      : progressStep === 1
+      ? 'Bước 2: Sẵn sàng giải'
+      : progressStep === 2
+      ? 'Bước 3: Đang giải chi tiết'
+      : 'Hoàn tất lời giải';
+
+  const rootCls = 'space-y-6' + (solution ? ' pb-24' : '');
+
   return (
-    <div className="space-y-6">
+    <div className={rootCls}>
       {/* Solver Banner */}
       <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-700 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
@@ -280,6 +304,44 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
           </p>
         </div>
         <div className="absolute right-0 -bottom-10 w-72 h-72 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+      </div>
+
+      {/* Progress bar: Nhập đề -> Giải -> Hoàn tất */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+            <ListOrdered className="w-3.5 h-3.5 text-blue-600" />
+            {progressLabel}
+          </span>
+          <span className="text-[11px] font-bold text-blue-700">{progressPct}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r from-blue-600 to-indigo-500 ${
+              progressStep === 2 ? 'animate-pulse' : ''
+            }`}
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between mt-2 text-[10px] font-semibold text-slate-400">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(1)}
+            className={`px-1.5 py-0.5 rounded-md transition-colors ${progressStep >= 1 ? 'text-blue-700' : ''}`}
+          >
+            1. Chọn môn
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileOpen(2)}
+            className={`px-1.5 py-0.5 rounded-md transition-colors ${progressStep >= 1 ? 'text-blue-700' : ''}`}
+          >
+            2. Nhập đề
+          </button>
+          <span className={`px-1.5 py-0.5 rounded-md ${progressStep >= 3 ? 'text-emerald-600' : ''}`}>
+            3. Lời giải
+          </span>
+        </div>
       </div>
 
       {/* Hạn mức AI miễn phí hôm nay */}
@@ -326,12 +388,17 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
           {/* 1. Chọn Môn Học */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleStep(1)}
+                className="lg:cursor-default flex items-center gap-2 text-left flex-1"
+              >
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
                   1
                 </span>
-                Môn Học {gradeLabel}
-              </label>
+                <span className="text-sm font-bold text-slate-800">Môn Học {gradeLabel}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 lg:hidden transition-transform ${mobileOpen === 1 ? 'rotate-180' : ''}`} />
+              </button>
               {currentSubject.loigiaihayUrl && (
                 <a
                   href={currentSubject.loigiaihayUrl}
@@ -346,6 +413,7 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
               )}
             </div>
 
+            <div className={stepBodyCls(1)}>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {subjects.map((s) => {
                 const isSelected = s.id === selectedSubjectId;
@@ -373,19 +441,28 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
                 );
               })}
             </div>
+            </div>
           </div>
 
           {/* 2. Nhập Đề Bài hoặc Tải Ảnh */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleStep(2)}
+                className="lg:cursor-default flex items-center gap-2 text-left"
+              >
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
                   2
                 </span>
-                Đề Bài Tập (Văn bản hoặc Chụp ảnh)
-              </label>
+                <span className="text-sm font-bold text-slate-800">
+                  Đề Bài Tập (Văn bản hoặc Chụp ảnh)
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 lg:hidden transition-transform ${mobileOpen === 2 ? 'rotate-180' : ''}`} />
+              </button>
             </div>
 
+            <div className={stepBodyCls(2)}>
             {/* Textarea */}
             <div>
               <textarea
@@ -480,18 +557,25 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* 3. Chế Độ Lời Giải & Nút Giải */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleStep(3)}
+                className="lg:cursor-default flex items-center gap-2 text-left"
+              >
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
                   3
                 </span>
-                Chế Độ Giải
-              </label>
+                <span className="text-sm font-bold text-slate-800">Chế Độ Giải</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 lg:hidden transition-transform ${mobileOpen === 3 ? 'rotate-180' : ''}`} />
+              </button>
 
+              <div className={stepBodyCls(3)}>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
@@ -532,9 +616,8 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
                   <span className="text-[10px] text-slate-500">So kết quả đề thi</span>
                 </button>
               </div>
-            </div>
 
-            {/* Error banner */}
+              {/* Error banner */}
             {errorMsg && (
               <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex flex-col gap-2">
                 <div className="flex items-start gap-2">
@@ -572,8 +655,10 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
                 </>
               )}
             </button>
+            </div>
+              </div>
+            </div>
           </div>
-        </div>
 
         {/* Right Column: Output & Followup Tutor */}
         <div ref={outputRef} className="lg:col-span-7 space-y-4 scroll-mt-24">
@@ -748,6 +833,63 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Sticky bottom bar: Lưu / Sao chép / In / Giải tiếp (hiện khi có lời giải) */}
+      {solution && (
+        <div className="fixed bottom-0 inset-x-0 z-40 px-3 pb-3 pointer-events-none">
+          <div className="max-w-7xl mx-auto bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 p-2.5 flex items-center gap-2 pointer-events-auto flex-wrap">
+            <button
+              onClick={handleSave}
+              disabled={alreadySaved}
+              className={`flex-1 min-w-[120px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+                alreadySaved
+                  ? 'bg-emerald-100 text-emerald-700 cursor-default'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-100 active:scale-[0.98]'
+              }`}
+            >
+              {alreadySaved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Đã lưu
+                </>
+              ) : (
+                <>
+                  <Bookmark className="w-4 h-4" />
+                  Lưu vào Vở Ghi
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1.5"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              <span className="hidden sm:inline">{copied ? 'Đã chép' : 'Sao chép'}</span>
+            </button>
+            <button
+              onClick={() => window.print()}
+              title="In lời giải"
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center justify-center"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                setSolution('');
+                setErrorMsg(null);
+                setTutorChat([]);
+                setCopied(false);
+                if (outputRef.current) outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }}
+              title="Giải bài tập khác"
+              className="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white border-2 border-slate-900/10 hover:border-blue-300 text-slate-700 hover:text-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Giải tiếp
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

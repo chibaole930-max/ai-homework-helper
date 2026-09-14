@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { AppDashboard, OpenFeature } from './components/AppDashboard';
 import { LessonNoteTab } from './components/LessonNoteTab';
@@ -13,16 +13,20 @@ import { PresetLibraryTab } from './components/PresetLibraryTab';
 import { HocBaTab } from './components/HocBaTab';
 import { LoTrinhTab } from './components/LoTrinhTab';
 import AdminTab from './components/AdminTab';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { VipModal } from './components/VipModal';
 import { SavedStudyItem, GradeId } from './types';
+import { authHeaders } from './lib/auth';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
-import { CheckCircle2, Megaphone, Wrench, HeartHandshake, FolderHeart, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, Megaphone, Wrench, HeartHandshake, FolderHeart, ArrowLeft, Lock } from 'lucide-react';
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
+
+// Các tính năng bắt buộc phải đăng nhập trước khi dùng
+const AUTH_REQUIRED_FEATURES: OpenFeature[] = ['notes', 'solver', 'transcript', 'path'];
 
 interface SiteStatus {
   maintenance: {
@@ -52,6 +56,7 @@ function ModuleMaintenancePanel({ message }: { message: string }) {
 }
 
 function AppContent() {
+  const { user, openAuth } = useAuth();
   const [openFeature, setOpenFeature] = useState<OpenFeature | null>(null);
   const [grade, setGrade] = useState<GradeId>('12');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -175,6 +180,50 @@ const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
     }
   }, [savedItems]);
 
+  // Nếu feature yêu cầu đăng nhập và user chưa đăng nhập -> mở modal đăng nhập
+  const openFeatureChecked = useCallback(
+    (feature: OpenFeature) => {
+      if (AUTH_REQUIRED_FEATURES.includes(feature) && !user) {
+        openAuth();
+        return;
+      }
+      setOpenFeature(feature);
+    },
+    [user, openAuth]
+  );
+
+  // Khi đăng nhập -> đồng bộ các bài đã lưu từ Database về Vở Ghi
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch('/api/lessons', { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.lessons)) return;
+        const serverItems: SavedStudyItem[] = data.lessons.map((l: any) => ({
+          id: String(l.id),
+          type: l.type === 'exercise' ? 'exercise' : 'note',
+          title: String(l.title || ''),
+          subject: String(l.subject || ''),
+          subjectId: String(l.subjectId || ''),
+          textbook: String(l.textbook || ''),
+          content: String(l.content || ''),
+          date: String(l.date || ''),
+          isFavorite: !!l.isFavorite,
+          style: l.style || undefined,
+          originalProblem: l.originalProblem || undefined,
+        }));
+        setSavedItems((prev) => {
+          const seen = new Set(serverItems.map((i) => i.title + '::' + i.subject));
+          return [...serverItems, ...prev.filter((i) => !seen.has(i.title + '::' + i.subject))];
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, user?.id]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -182,7 +231,7 @@ const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
     }, 3000);
   };
 
-  const handleSaveItem = (itemData: Omit<SavedStudyItem, 'id' | 'date'>) => {
+const handleSaveItem = async (itemData: Omit<SavedStudyItem, 'id' | 'date'>) => {
     const exists = savedItems.some(
       (item) => item.title === itemData.title && item.subject === itemData.subject
     );
@@ -190,9 +239,10 @@ const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
       showToast('Bài này đã có trong Vở Ghi của bạn!');
       return;
     }
+    const localId = 'saved-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
     const newItem: SavedStudyItem = {
       ...itemData,
-      id: 'saved-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      id: localId,
       date: new Date().toLocaleDateString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
@@ -201,6 +251,36 @@ const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
     };
     setSavedItems((prev) => [newItem, ...prev]);
     showToast('Đã lưu bài học vào Vở Ghi thành công!');
+
+    // Đồng bộ lên Database khi đã đăng nhập (lưu local trước, sync sau)
+    if (user) {
+      try {
+        const res = await fetch('/api/lessons', {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: itemData.type,
+            title: itemData.title,
+            subject: itemData.subject,
+            subjectId: itemData.subjectId,
+            textbook: itemData.textbook,
+            content: itemData.content,
+            isFavorite: itemData.isFavorite,
+            style: itemData.style,
+            originalProblem: itemData.originalProblem,
+          }),
+        });
+        const data = await res.json();
+        const serverId = data?.lesson?.id;
+        if (serverId && serverId !== localId) {
+          setSavedItems((prev) =>
+            prev.map((item) => (item.id === localId ? { ...item, id: serverId } : item))
+          );
+        }
+      } catch {
+        // Mất mạng -> vẫn giữ bài ở local, đồng bộ khi đăng nhập lại
+      }
+    }
   };
 
   const handleImportPreset = (item: SavedStudyItem) => {
@@ -223,17 +303,33 @@ const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
         item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
       )
     );
+    // Đồng bộ trạng thái yêu thích lên server nếu bài đã nằm trên Database
+    if (user && !id.startsWith('saved-')) {
+      fetch('/api/lessons/' + encodeURIComponent(id) + '/toggle-favorite', {
+        method: 'POST',
+        headers: authHeaders(),
+      }).catch(() => {});
+    }
   };
 
   const handleDeleteItem = (id: string) => {
     setSavedItems((prev) => prev.filter((item) => item.id !== id));
     showToast('Đã xóa bài khỏi Vở Ghi.');
+    if (user && !id.startsWith('saved-')) {
+      fetch('/api/lessons/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }).catch(() => {});
+    }
   };
 
   const handleClearAll = () => {
     if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ bài trong Vở Ghi?')) {
       setSavedItems([]);
       showToast('Đã dọn sạch Vở Ghi.');
+      if (user) {
+        fetch('/api/lessons', { method: 'DELETE', headers: authHeaders() }).catch(() => {});
+      }
     }
   };
 
@@ -380,12 +476,12 @@ case 'saved':
           ) : (
             <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
 <AppDashboard
-                grade={grade}
-                subjects={subjects}
-                savedItems={savedItems}
-                onOpenFeature={setOpenFeature}
-                onGradeChange={setGrade}
-              />
+                  grade={grade}
+                  subjects={subjects}
+                  savedItems={savedItems}
+                  onOpenFeature={openFeatureChecked}
+                  onGradeChange={setGrade}
+                />
             </div>
           )}
         </main>
@@ -406,12 +502,12 @@ case 'saved':
         {openFeature === null ? (
           <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
 <AppDashboard
-              grade={grade}
-              subjects={subjects}
-              savedItems={savedItems}
-              onOpenFeature={setOpenFeature}
-              onGradeChange={setGrade}
-            />
+                grade={grade}
+                subjects={subjects}
+                savedItems={savedItems}
+                onOpenFeature={openFeatureChecked}
+                onGradeChange={setGrade}
+              />
           </div>
         ) : (
           <div className="h-full flex flex-col">

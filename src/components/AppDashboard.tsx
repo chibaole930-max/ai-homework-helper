@@ -9,6 +9,8 @@ import {
   ClipboardList,
   Route,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Stagger, StaggerItem } from './Motion';
 import { GradeId, SavedStudyItem, SubjectInfo } from '../types';
 
 export type OpenFeature = 'notes' | 'solver' | 'presets' | 'saved' | 'transcript' | 'path';
@@ -40,7 +42,7 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
     <button
       onClick={onOpen}
       title={tile.title}
-      className="group relative h-full w-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400"
+      className="group relative h-full w-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] active:translate-y-0 active:scale-[0.99] transition-all duration-200 flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400"
     >
       <div className={`shrink-0 h-1.5 w-full ${tile.accentBar}`} />
       <div className="flex-1 min-h-0 p-3 sm:p-4 flex flex-col gap-1.5">
@@ -218,7 +220,12 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
   return (
     <div className="h-full flex flex-col gap-2 sm:gap-3">
       {/* Hero */}
-      <div className="shrink-0 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white p-3 sm:p-4 shadow-md flex items-center gap-3 sm:gap-5">
+      <motion.div
+        initial={{ opacity: 0, y: -14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="shrink-0 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white p-3 sm:p-4 shadow-md flex items-center gap-3 sm:gap-5"
+      >
         <div className="absolute -right-10 -top-14 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute right-24 -bottom-16 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 flex-1 min-w-0">
@@ -240,7 +247,7 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
           <Sparkles className="w-4 h-4 text-amber-500" />
           Soạn bài ngay
         </button>
-      </div>
+      </motion.div>
 
       {/* Khối selector + lớp */}
       <div className="shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-2.5 sm:p-3 space-y-2.5">
@@ -276,48 +283,61 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
           </button>
         </div>
 
-        {/* Chọn lớp trong khối */}
-        <div className="flex items-center gap-1">
-          {blockGrades.map((g) => (
-            <button
-              key={g}
-              onClick={() => onGradeChange(g)}
-              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 border ${
-                grade === g
-                  ? isTHCS
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Lớp {g}
-            </button>
-          ))}
-        </div>
+        {/* Chọn lớp trong khối + môn học (animate khi đổi khối/lớp) */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${grade}-block`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="space-y-2.5"
+          >
+            <div className="flex items-center gap-1">
+              {blockGrades.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => onGradeChange(g)}
+                  className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 border hover:-translate-y-0.5 ${
+                    grade === g
+                      ? isTHCS
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Lớp {g}
+                </button>
+              ))}
+            </div>
 
-        {/* Môn học GDPT 2018 */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mr-0.5">
-            Môn:
-          </span>
-          {subjectMeta.map((s) => (
-            <span
-              key={s.id}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${s.tagStyle}`}
-            >
-              {s.shortName}
-              <span className="opacity-70">{s.tag}</span>
-            </span>
-          ))}
-        </div>
+            {/* Môn học GDPT 2018 */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mr-0.5">
+                Môn:
+              </span>
+              {subjectMeta.map((s) => (
+                <span
+                  key={s.id}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${s.tagStyle}`}
+                >
+                  {s.shortName}
+                  <span className="opacity-70">{s.tag}</span>
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Tiles */}
-      <div className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 overflow-y-auto">
+      <Stagger className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 overflow-y-auto">
         {tiles.map((t) => (
-          <FeatureTile key={t.feature} tile={t} onOpen={() => onOpenFeature(t.feature)} />
+          <StaggerItem key={t.feature} className="h-full min-h-0">
+            <FeatureTile tile={t} onOpen={() => onOpenFeature(t.feature)} />
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
     </div>
   );
 };
