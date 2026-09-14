@@ -39,7 +39,7 @@ def load_config() -> dict:
 
     raw: dict = {}
     if CONFIG_PATH.exists():
-        with open(CONFIG_PATH, encoding="utf-8") as f:
+        with open(CONFIG_PATH, encoding="utf-8-sig") as f:
             raw = json.load(f)
 
     _config = {
