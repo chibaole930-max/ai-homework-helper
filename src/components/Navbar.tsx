@@ -79,20 +79,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {/* Grade Switcher */}
-          <div className="flex items-center gap-0.5 px-1.5 py-1 rounded-xl bg-slate-100 border border-slate-200">
-            {(['9', '10', '11', '12'] as GradeId[]).map((g) => (
-              <button
-                key={g}
-                onClick={() => onGradeChange(g)}
-                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all duration-150 ${
-                  grade === g
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-                }`}
-              >
-                {g}
-              </button>
-            ))}
+          <div className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-slate-100 border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-500 pl-1 pr-0.5 hidden sm:inline">
+              Lớp
+            </span>
+            <select
+              value={grade}
+              onChange={(e) => onGradeChange(e.target.value as GradeId)}
+              className="bg-white border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+              title="Chọn lớp"
+            >
+              {(['6', '7', '8', '9', '10', '11', '12'] as GradeId[]).map((g) => (
+                <option key={g} value={g}>
+                  Lớp {g}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Auth & VIP */}

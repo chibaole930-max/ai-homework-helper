@@ -6,16 +6,19 @@ import {
   FolderHeart,
   ChevronRight,
   GraduationCap,
+  ClipboardList,
+  Route,
 } from 'lucide-react';
-import { SavedStudyItem, SubjectInfo } from '../types';
+import { GradeId, SavedStudyItem, SubjectInfo } from '../types';
 
-export type OpenFeature = 'notes' | 'solver' | 'presets' | 'saved';
+export type OpenFeature = 'notes' | 'solver' | 'presets' | 'saved' | 'transcript' | 'path';
 
 interface AppDashboardProps {
-  grade: string;
+  grade: GradeId;
   subjects: SubjectInfo[];
   savedItems: SavedStudyItem[];
   onOpenFeature: (feature: OpenFeature) => void;
+  onGradeChange: (grade: GradeId) => void;
 }
 
 interface TileDef {
@@ -37,7 +40,7 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
     <button
       onClick={onOpen}
       title={tile.title}
-      className="group relative h-full w-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex flex-col focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      className="group relative h-full w-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400"
     >
       <div className={`shrink-0 h-1.5 w-full ${tile.accentBar}`} />
       <div className="flex-1 min-h-0 p-3 sm:p-4 flex flex-col gap-1.5">
@@ -47,7 +50,7 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
           >
             <Icon className="w-5 h-5" />
           </div>
-          <span className="text-[10px] font-extrabold text-slate-300 group-hover:text-indigo-600 flex items-center gap-0.5 whitespace-nowrap transition-colors">
+          <span className="text-[10px] font-extrabold text-slate-300 group-hover:text-blue-600 flex items-center gap-0.5 whitespace-nowrap transition-colors">
             {tile.cta}
             <ChevronRight className="w-3.5 h-3.5" />
           </span>
@@ -86,12 +89,51 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
   );
 }
 
+const THCS_GRADES: GradeId[] = ['6', '7', '8', '9'];
+const THPT_GRADES: GradeId[] = ['10', '11', '12'];
+
+const THCS_REQUIRED: SubjectInfo['id'][] = ['toan', 'van', 'anh', 'khtn', 'sudia', 'gdcd', 'tin', 'congnghe'];
+const THPT_REQUIRED: SubjectInfo['id'][] = ['toan', 'van', 'anh', 'su'];
+const THPT_ELECTIVE: SubjectInfo['id'][] = ['ly', 'hoa', 'sinh', 'dia', 'gdktpl', 'tin', 'congnghe'];
+
 export const AppDashboard: React.FC<AppDashboardProps> = ({
   grade,
   subjects,
   savedItems,
   onOpenFeature,
+  onGradeChange,
 }) => {
+  const isTHCS = THCS_GRADES.includes(grade);
+  const blockGrades = isTHCS ? THCS_GRADES : THPT_GRADES;
+
+  const subjectMeta = subjects.map((s) => {
+    if (isTHCS) {
+      return {
+        ...s,
+        tag: THCS_REQUIRED.includes(s.id) ? 'Bắt buộc' : 'Tự chọn',
+        tagStyle: THCS_REQUIRED.includes(s.id)
+          ? 'bg-blue-50 text-blue-700 border-blue-200'
+          : 'bg-orange-50 text-orange-700 border-orange-200',
+      };
+    }
+    if (THPT_REQUIRED.includes(s.id)) {
+      return { ...s, tag: 'Bắt buộc', tagStyle: 'bg-blue-50 text-blue-700 border-blue-200' };
+    }
+    if (THPT_ELECTIVE.includes(s.id)) {
+      const combo = ['ly', 'hoa', 'sinh'].includes(s.id)
+        ? 'KHTN'
+        : ['su', 'dia', 'gdktpl'].includes(s.id)
+          ? 'KHXH'
+          : 'Tự chọn';
+      return {
+        ...s,
+        tag: `Tổ hợp ${combo}`,
+        tagStyle: 'bg-orange-50 text-orange-700 border-orange-200',
+      };
+    }
+    return { ...s, tag: 'Tự chọn', tagStyle: 'bg-orange-50 text-orange-700 border-orange-200' };
+  });
+
   const tiles: TileDef[] = [
     {
       feature: 'notes',
@@ -147,38 +189,131 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
           : ['Trống'],
       cta: 'Xem vở',
     },
+    {
+      feature: 'transcript',
+      number: '5',
+      title: 'Sổ Học Bạ',
+      subtitle: 'Đặt chỉ tiêu điểm TBM',
+      icon: ClipboardList,
+      accentBar: 'bg-gradient-to-r from-blue-500 to-sky-500',
+      iconBg: 'bg-gradient-to-tr from-blue-500 to-sky-500',
+      desc: 'Nhập điểm TBM mong muốn theo từng môn, theo dõi tiến độ đạt được cả năm.',
+      chips: ['Điểm TBM', 'Mục tiêu', 'Theo dõi'],
+      cta: 'Mở sổ',
+    },
+    {
+      feature: 'path',
+      number: '6',
+      title: 'Lộ Trình Học Tập',
+      subtitle: 'Lộ trình cá nhân hóa',
+      icon: Route,
+      accentBar: 'bg-gradient-to-r from-orange-500 to-amber-500',
+      iconBg: 'bg-gradient-to-tr from-orange-500 to-amber-500',
+      desc: 'Khai mục tiêu của bạn, AI xây lộ trình học từng môn, từng giai đoạn phù hợp.',
+      chips: ['Mục tiêu', 'Cá nhân hóa', 'AI'],
+      cta: 'Tạo lộ trình',
+    },
   ];
 
   return (
-    <div className="h-full flex flex-col gap-3 sm:gap-4">
+    <div className="h-full flex flex-col gap-2 sm:gap-3">
       {/* Hero */}
-      <div className="shrink-0 relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-700 via-blue-600 to-sky-500 text-white p-4 sm:p-5 shadow-md flex items-center gap-3 sm:gap-5">
+      <div className="shrink-0 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white p-3 sm:p-4 shadow-md flex items-center gap-3 sm:gap-5">
         <div className="absolute -right-10 -top-14 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute right-24 -bottom-16 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 flex-1 min-w-0">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-indigo-100 text-[11px] font-semibold mb-2 backdrop-blur-sm">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-blue-100 text-[11px] font-semibold mb-1.5 backdrop-blur-sm">
             <GraduationCap className="w-3.5 h-3.5" />
-            Trợ lý học tập lớp {grade}
+            {isTHCS ? 'Khối THCS' : 'Khối THPT'} • Hỗ trợ học tập lớp {grade}
           </span>
-          <h1 className="text-lg sm:text-2xl font-extrabold tracking-tight leading-tight">
+          <h1 className="text-base sm:text-xl font-extrabold tracking-tight leading-tight">
             Học giỏi – nhẹ nhàng hơn mỗi ngày
           </h1>
-          <p className="hidden sm:block text-xs text-indigo-100 mt-1">
-            Soạn bài, giải bài, kho bài mẫu và vở ghi — tất cả nằm gọn trong một màn hình.
+          <p className="hidden sm:block text-xs text-blue-100 mt-0.5">
+            Soạn bài, giải bài, kho bài mẫu, sổ học bạ và lộ trình — gọn trong một màn hình.
           </p>
         </div>
         <button
           onClick={() => onOpenFeature('notes')}
-          className="relative z-10 shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-50 active:scale-[0.98] transition-all text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-900/20"
+          className="relative z-10 shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-white text-blue-700 hover:bg-blue-50 active:scale-[0.98] transition-all text-xs sm:text-sm font-extrabold shadow-lg shadow-blue-900/20"
         >
           <Sparkles className="w-4 h-4 text-amber-500" />
-          <span className="hidden xs:inline sm:inline">Soạn bài ngay</span>
-          <span className="xs:hidden sm:hidden">Soạn bài</span>
+          Soạn bài ngay
         </button>
       </div>
 
+      {/* Khối selector + lớp */}
+      <div className="shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-2.5 sm:p-3 space-y-2.5">
+        {/* Chọn khối */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200">
+          <button
+            onClick={() => {
+              const target = isTHCS ? THPT_GRADES[0] : THCS_GRADES[0];
+              onGradeChange(target);
+            }}
+            className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 ${
+              isTHCS
+                ? 'bg-gradient-to-tr from-blue-600 to-sky-500 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+            }`}
+          >
+            🏫 Khối THCS
+            <span className="ml-1 opacity-80 hidden sm:inline">(Lớp 6 - 9)</span>
+          </button>
+          <button
+            onClick={() => {
+              const target = isTHCS ? THPT_GRADES[0] : THCS_GRADES[0];
+              onGradeChange(target);
+            }}
+            className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 ${
+              !isTHCS
+                ? 'bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+            }`}
+          >
+            🎓 Khối THPT
+            <span className="ml-1 opacity-80 hidden sm:inline">(Lớp 10 - 12)</span>
+          </button>
+        </div>
+
+        {/* Chọn lớp trong khối */}
+        <div className="flex items-center gap-1">
+          {blockGrades.map((g) => (
+            <button
+              key={g}
+              onClick={() => onGradeChange(g)}
+              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 border ${
+                grade === g
+                  ? isTHCS
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Lớp {g}
+            </button>
+          ))}
+        </div>
+
+        {/* Môn học GDPT 2018 */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mr-0.5">
+            Môn:
+          </span>
+          {subjectMeta.map((s) => (
+            <span
+              key={s.id}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${s.tagStyle}`}
+            >
+              {s.shortName}
+              <span className="opacity-70">{s.tag}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Tiles */}
-      <div className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 overflow-y-auto">
         {tiles.map((t) => (
           <FeatureTile key={t.feature} tile={t} onOpen={() => onOpenFeature(t.feature)} />
         ))}

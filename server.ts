@@ -1571,6 +1571,7 @@ const STATS_EVENTS = [
   "lesson_note",
   "solve_exercise",
   "tutor_followup",
+  "learning_path",
   "community_share",
 ] as const;
 type StatEvent = (typeof STATS_EVENTS)[number];
@@ -1580,6 +1581,7 @@ const STATS_EVENT_LABELS: Record<StatEvent, string> = {
   lesson_note: "Soạn bài AI",
   solve_exercise: "Giải bài AI",
   tutor_followup: "Hỏi đáp thêm",
+  learning_path: "Lộ trình cá nhân hóa",
   community_share: "Chia sẻ bài mẫu",
 };
 
@@ -2969,6 +2971,72 @@ Hãy giải đáp cặn kẽ và ngắn gọn, truyền cảm hứng giúp học
       res.status(500).json({
         error: friendlyMsg,
       });
+    }
+  });
+
+  // API: Lộ trình học tập cá nhân hóa
+  app.post("/api/learning-path", async (req, res) => {
+    try {
+      const { grade, career, strength, weakness, hours } = req.body;
+
+      if (!career || String(career).trim().length < 2) {
+        return res.status(400).json({ error: "Vui lòng nhập mục tiêu nghề nghiệp." });
+      }
+
+      if (!(await checkAiUsageLimit(req, res))) return;
+
+      const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
+      const block =
+        Number(grade) <= 9
+          ? "Trung học cơ sở (THCS)"
+          : "Trung học phổ thông (THPT)";
+
+      const aiClients = getGeminiClients();
+
+      const systemInstruction = `Bạn là chuyên gia tư vấn giáo dục và hướng nghiệp hàng đầu Việt Nam, am hiểu sâu chương trình GDPT 2018. Hãy xây dựng lộ trình học tập cá nhân hóa, chi tiết, khả thi và truyền cảm hứng cho học sinh.`;
+
+      const prompt = `YÊU CẦU: Xây dựng lộ trình học tập cá nhân hóa cho học sinh ${gradeLabel} (${block}).
+
+Thông tin học sinh:
+- Nghề nghiệp mong muốn: ${String(career).trim()}
+- Môn học mạnh: ${strength ? String(strength).trim() : "Chưa rõ"}
+- Môn học yếu cần cải thiện: ${weakness ? String(weakness).trim() : "Chưa rõ"}
+- Thời gian tự học mỗi ngày: ${hours || 2} giờ
+
+Hãy trả về lộ trình chi tiết (Markdown) gồm:
+## 1. Phân tích định hướng nghề nghiệp
+Liên hệ giữa mục tiêu nghề nghiệp với các môn học cần tập trung, tổ hợp môn phù hợp nếu cần.
+
+## 2. Lộ trình theo giai đoạn
+Chia thành các giai đoạn ngắn hạn (1-2 tháng), trung hạn (3-6 tháng), dài hạn (cuối năm). Mỗi giai đoạn:
+- Mục tiêu cụ thể
+- Môn học cần tập trung + nội dung chính
+- Số giờ/tuần phân bổ hợp lý
+
+## 3. Chi tiết phân bổ thời gian hàng ngày
+Gợi ý lịch học thực tế dựa trên ${hours || 2} giờ/ngày.
+
+## 4. Phương pháp học tập hiệu quả
+Mẹo học tập phù hợp với từng nhóm môn.
+
+## 5. Kiểm tra & đánh giá
+Cách tự kiểm tra tiến độ, dấu hiệu cần điều chỉnh.
+
+Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
+
+      const response = await generateContentWithFallback(aiClients, {
+        contents: prompt,
+        config: { systemInstruction, temperature: 0.45 },
+      });
+
+      await incrementUsage(usageKey(req));
+      await bumpStat("learning_path", req).catch(() => {});
+
+      res.json({ markdown: response.text || "Không thể tạo lộ trình. Vui lòng thử lại." });
+    } catch (err: any) {
+      console.error("Error generating learning path:", err);
+      const friendlyMsg = parseGeminiErrorMessage(err);
+      res.status(500).json({ error: friendlyMsg });
     }
   });
 

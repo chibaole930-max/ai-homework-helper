@@ -1,0 +1,8 @@
+{
+  "telegram_token": "",
+  "allowed_user_ids": [],
+  "password": "hanks",
+  "opencode_url": "http://localhost:4096",
+  "gemini_api_key": "",
+  "gemini_model": "gemini-2.0-flash"
+}

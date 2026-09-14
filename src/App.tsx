@@ -10,6 +10,8 @@ import { LessonNoteTab } from './components/LessonNoteTab';
 import { ExerciseSolverTab } from './components/ExerciseSolverTab';
 import { SavedNotesTab } from './components/SavedNotesTab';
 import { PresetLibraryTab } from './components/PresetLibraryTab';
+import { HocBaTab } from './components/HocBaTab';
+import { LoTrinhTab } from './components/LoTrinhTab';
 import AdminTab from './components/AdminTab';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModal } from './components/AuthModal';
@@ -65,8 +67,8 @@ function AppContent() {
   );
 
   useEffect(() => {
-    const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
-    if (savedGrade === '9' || savedGrade === '10' || savedGrade === '11' || savedGrade === '12') {
+const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
+    if (savedGrade === '6' || savedGrade === '7' || savedGrade === '8' || savedGrade === '9' || savedGrade === '10' || savedGrade === '11' || savedGrade === '12') {
       setGrade(savedGrade);
     }
   }, []);
@@ -252,10 +254,12 @@ function AppContent() {
   }
 
   const FEATURE_TITLES: Record<OpenFeature, string> = {
-    notes: 'Soạn Bài Ghi',
+notes: 'Soạn Bài Ghi',
     solver: 'Giải Bài Tập',
     presets: 'Kho Bài Mẫu',
     saved: 'Vở Ghi',
+    transcript: 'Sổ Học Bạ',
+    path: 'Lộ Trình Học Tập',
   };
 
   const renderFeature = (feature: OpenFeature) => {
@@ -296,7 +300,7 @@ function AppContent() {
             grade={grade}
           />
         );
-      case 'saved':
+case 'saved':
         return (
           <SavedNotesTab
             items={savedItems}
@@ -307,6 +311,10 @@ function AppContent() {
             gradeLabel={gradeLabel}
           />
         );
+      case 'transcript':
+        return <HocBaTab subjects={subjects} grade={grade} />;
+      case 'path':
+        return <LoTrinhTab grade={grade} />;
     }
   };
 
@@ -376,6 +384,7 @@ function AppContent() {
                 subjects={subjects}
                 savedItems={savedItems}
                 onOpenFeature={setOpenFeature}
+                onGradeChange={setGrade}
               />
             </div>
           )}
@@ -401,6 +410,7 @@ function AppContent() {
               subjects={subjects}
               savedItems={savedItems}
               onOpenFeature={setOpenFeature}
+              onGradeChange={setGrade}
             />
           </div>
         ) : (
