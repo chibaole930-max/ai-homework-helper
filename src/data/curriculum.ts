@@ -648,7 +648,7 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
   anh: [
     {
       id: 'anh-u1',
-      title: 'Unit 1: Life Stories',
+      title: 'Unit 1: Life Stories We Admire',
       description: 'Grammar: Past Simple vs. Past Continuous, Vocabulary about inspiring lives',
       lessons: [
         { id: 'anh-l1', number: 'Lesson 1', title: 'Getting Started: Exceptional role models' },
@@ -670,31 +670,81 @@ export const SUBJECT_CURRICULUM: Partial<Record<SubjectId, CurriculumChapter[]>>
     {
       id: 'anh-u3',
       title: 'Unit 3: Green Living',
-      description: 'Grammar: Gerunds and Infinitives, Environmental protection',
+      description: 'Grammar: Verbs with prepositions & Relative clauses, Environmental protection',
       lessons: [
         { id: 'anh-l8', number: 'Lesson 1', title: 'Getting Started: Sustainable lifestyle habits' },
-        { id: 'anh-l9', number: 'Lesson 2', title: 'Language: Complex sentence structures' },
+        { id: 'anh-l9', number: 'Lesson 2', title: 'Language: Verbs with prepositions & Relative clauses' },
         { id: 'anh-l10', number: 'Lesson 3', title: 'Reading: Eco-friendly innovations and carbon footprint' },
       ],
     },
     {
       id: 'anh-u4',
       title: 'Unit 4: Urbanisation',
-      description: 'Grammar: Subjunctive mood / Conditional sentences, Smart cities',
+      description: 'Grammar: Present perfect (review) & Double comparisons, Smart cities',
       lessons: [
-        { id: 'anh-l11', number: 'Lesson 1', title: 'Getting Started: Pros and cons of moving to megacities' },
-        { id: 'anh-l12', number: 'Lesson 2', title: 'Language: Phrasal verbs & Advanced conditionals' },
+        { id: 'anh-l11', number: 'Lesson 1', title: 'Getting Started: Pros and cons of megacities' },
+        { id: 'anh-l12', number: 'Lesson 2', title: 'Language: Present perfect & Double comparisons' },
         { id: 'anh-l13', number: 'Lesson 3', title: 'Reading: Sustainable urban development' },
       ],
     },
     {
       id: 'anh-u5',
-      title: 'Unit 5: Artificial Intelligence & The Future of Work',
-      description: 'Grammar: Passive voice with modals, Relative clauses',
+      title: 'Unit 5: The World of Work',
+      description: 'Grammar: Simple/Compound/Complex sentences, Careers and future jobs',
       lessons: [
-        { id: 'anh-l14', number: 'Lesson 1', title: 'Getting Started: AI tools and future careers' },
-        { id: 'anh-l15', number: 'Lesson 2', title: 'Language: Technical collocations & Passive forms' },
-        { id: 'anh-l16', number: 'Lesson 3', title: 'Reading: How automation transforms workplaces' },
+        { id: 'anh-l14', number: 'Lesson 1', title: 'Getting Started: Jobs and career planning' },
+        { id: 'anh-l15', number: 'Lesson 2', title: 'Language: Sentence structures & Prepositional phrases' },
+        { id: 'anh-l16', number: 'Lesson 3', title: 'Reading: How technology transforms workplaces' },
+      ],
+    },
+    {
+      id: 'anh-u6',
+      title: 'Unit 6: Artificial Intelligence',
+      description: 'Grammar: Causative (active & passive), Technology and smart machines',
+      lessons: [
+        { id: 'anh-l17', number: 'Lesson 1', title: 'Getting Started: AI in daily life' },
+        { id: 'anh-l18', number: 'Lesson 2', title: 'Language: Causative forms & technical vocabulary' },
+        { id: 'anh-l19', number: 'Lesson 3', title: 'Reading: Applications of artificial intelligence' },
+      ],
+    },
+    {
+      id: 'anh-u7',
+      title: 'Unit 7: The World of Mass Media',
+      description: 'Grammar: Adverb clauses of manner & result, Media literacy',
+      lessons: [
+        { id: 'anh-l20', number: 'Lesson 1', title: 'Getting Started: Traditional and digital media' },
+        { id: 'anh-l21', number: 'Lesson 2', title: 'Language: Adverb clauses of manner & result' },
+        { id: 'anh-l22', number: 'Lesson 3', title: 'Reading: Evaluating news and online information' },
+      ],
+    },
+    {
+      id: 'anh-u8',
+      title: 'Unit 8: Wildlife Conservation',
+      description: 'Grammar: Adverb clauses of condition & comparison, Protecting endangered species',
+      lessons: [
+        { id: 'anh-l23', number: 'Lesson 1', title: 'Getting Started: Endangered animals' },
+        { id: 'anh-l24', number: 'Lesson 2', title: 'Language: Adverb clauses of condition & comparison' },
+        { id: 'anh-l25', number: 'Lesson 3', title: 'Reading: Conservation efforts around the world' },
+      ],
+    },
+    {
+      id: 'anh-u9',
+      title: 'Unit 9: Career Paths',
+      description: 'Grammar: Three-part phrasal verbs, Choosing a future job',
+      lessons: [
+        { id: 'anh-l26', number: 'Lesson 1', title: 'Getting Started: Finding your dream job' },
+        { id: 'anh-l27', number: 'Lesson 2', title: 'Language: Three-part phrasal verbs & job vocabulary' },
+        { id: 'anh-l28', number: 'Lesson 3', title: 'Reading: Market trends and career choices' },
+      ],
+    },
+    {
+      id: 'anh-u10',
+      title: 'Unit 10: Lifelong Learning',
+      description: 'Grammar: Reported speech (commands, requests, suggestions, advice), Learning for life',
+      lessons: [
+        { id: 'anh-l29', number: 'Lesson 1', title: 'Getting Started: Learning at every age' },
+        { id: 'anh-l30', number: 'Lesson 2', title: 'Language: Reported speech & lifelong learning vocabulary' },
+        { id: 'anh-l31', number: 'Lesson 3', title: 'Reading: Continuous learning in the modern world' },
       ],
     },
   ],
