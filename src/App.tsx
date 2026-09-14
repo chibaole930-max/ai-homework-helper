@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
+import { FloatingBackground } from './components/FloatingBackground';
 import { AppDashboard, OpenFeature } from './components/AppDashboard';
 import { LessonNoteTab } from './components/LessonNoteTab';
 import { ExerciseSolverTab } from './components/ExerciseSolverTab';
@@ -339,10 +340,11 @@ const handleSaveItem = async (itemData: Omit<SavedStudyItem, 'id' | 'date'>) => 
     );
   };
 
-  if (isAdmin) {
+if (isAdmin) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-        <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 relative">
+        <FloatingBackground />
+        <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
           <AdminTab />
         </div>
       </div>
@@ -416,15 +418,16 @@ case 'saved':
 
   if (siteStatus?.maintenance.enabled) {
     const featureBlocked = openFeature !== null && openFeature !== 'saved';
-    return (
-      <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden">
+return (
+      <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden relative">
+        <FloatingBackground />
         <Navbar
           grade={grade}
           onGradeChange={setGrade}
           onlineCount={onlineCount}
           onHome={() => setOpenFeature(null)}
         />
-        <main className="flex-1 min-h-0 overflow-hidden">
+        <main className="flex-1 min-h-0 overflow-hidden relative">
           {featureBlocked ? (
             <div className="h-full flex items-center justify-center p-4">
               <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
@@ -489,8 +492,9 @@ case 'saved':
     );
   }
 
-  return (
-    <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+return (
+    <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 relative">
+      <FloatingBackground />
       <Navbar
         grade={grade}
         onGradeChange={setGrade}
@@ -498,7 +502,7 @@ case 'saved':
         onHome={() => setOpenFeature(null)}
       />
 
-      <main className="flex-1 min-h-0 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-hidden relative">
         {openFeature === null ? (
           <div className="h-full max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
 <AppDashboard
