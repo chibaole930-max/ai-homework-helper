@@ -913,7 +913,14 @@ async function generateContentWithFallback(
           const response = await ai.models.generateContent({
             model,
             contents: params.contents,
-            config: params.config,
+            // Đảm bảo bài soạn/giai thích dài không bị cắt giữa chừng (mặc định thường thấp)
+            // Model flash-lite có trần output 8192 token, các model flash lớn hơn dùng trần cao hơn.
+            config: {
+              ...(params.config || {}),
+              maxOutputTokens:
+                params.config?.maxOutputTokens ??
+                (model.includes("lite") ? 8192 : 16384),
+            },
           });
 
           if (response && response.text) {
@@ -3006,19 +3013,22 @@ Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
 
       let promptGoal = "";
       if (noteStyle === "loigiaihay_full" || noteStyle === "standard") {
-        promptGoal = `Soạn bài học ĐẦY ĐỦ CHUẨN LỜI GIẢI HAY (loigiaihay.com) bao gồm:
-1. 📘 TÓM TẮT LÝ THUYẾT TRỌNG TÂM:
-   - Các mục I, II, III... Định nghĩa, định lý, tính chất, công thức quan trọng, phản ứng hóa học hoặc văn bản văn học.
-   - Bảng tổng hợp công thức & ví dụ minh họa kinh điển.
-2. ❓ HƯỚNG DẪN TRẢ LỜI CÂU HỎI & HOẠT ĐỘNG GIỮA BÀI (SGK):
-   - Mở đầu / Khởi động: Đề bài -> Phương pháp giải -> Lời giải chi tiết.
-   - Hoạt động khám phá & Câu hỏi thảo luận trong bài.
-   - Luyện tập 1, 2... & Vận dụng 1, 2... (Phương pháp giải -> Lời giải chi tiết).
-3. 📝 HƯỚNG DẪN GIẢI BÀI TẬP CUỐI BÀI (SGK & SBT):
-   - Trích dẫn các bài tập cuối bài đặc trưng (Bài 1.1, 1.2, 1.3... theo chuẩn bộ sách ${textbook || "Kết nối tri thức"}).
-   - Mỗi bài đều có: Đề bài -> Phương pháp giải -> Lời giải chi tiết -> Đáp án.
-4. 💡 GHI NHỚ & MẸO LÀM BÀI (Lời Giải Hay Tips):
-   - Bẫy đề thi hay gặp, lưu ý quan trọng để không mất điểm.`;
+        promptGoal = `Soạn bài học ĐẦY ĐỦ CHUẨN LỜI GIẢI HAY (loigiaihay.com) — BÀI SOẠN PHẢI COVER TOÀN BỘ BÀI HỌC, không được dừng sớm, không được bỏ sót mục nào.
+
+QUY TẮC KIẾN TRÚC BÀI SOẠN (BẮT BUỘC):
+A. MỞ ĐẦU: dòng tiêu đề bài học (### Tên bài) + câu hỏi KHỞI ĐỘNG của SGK nếu có (Đề bài -> Lời giải).
+B. PHẦN LÝ THUYẾT THEO TỪNG MỤC I, II, III...:
+   - Liệt kê ĐẦY ĐỦ mọi mục lớn của bài trong SGK (mục I, II, III, IV... tương ứng đúng tên mục trong ${textbook || "Kết nối tri thức"}).
+   - VỚI MỖI mục: trình bày trọn vẹn
+     + định nghĩa / nội dung lý thuyết trọng tâm của mục đó (đủ các ý chính, bảng công thức nếu có),
+     + GIẢI HẾT các Câu hỏi / Hoạt động khám phá / Thảo luận / Luyện tập / Vận dụng nằm TRONG mục đó, mỗi câu theo cấu trúc: Đề bài -> Phương pháp giải -> Lời giải chi tiết -> Đáp số/Kết luận.
+   - Đặc biệt phần LUYỆN TẬP và VẬN DỤNG: không được bỏ, phải giải chi tiết từng câu như đúng SGK.
+C. PHẦN BÀI TẬP CUỐI BÀI (SGK & SBT):
+   - Giải đầy đủ các bài tập cuối bài (Bài 1.1, 1.2, 1.3... theo chuẩn bộ sách ${textbook || "Kết nối tri thức"}).
+   - Mỗi bài: Đề bài -> Phương pháp giải -> Lời giải chi tiết -> Đáp án.
+D. CUỐI BÀI: phần 💡 GHI NHỚ & MẸO LÀM BÀI (bẫy đề thi hay gặp, lưu ý quan trọng không để mất điểm).
+
+CẢNH BÁO: nếu bài học có 3-4 mục lớn thì phải có đủ 3-4 mục; chỉ soạn vài mục đầu là BÀI SOẠN LỖI.`;
       } else if (noteStyle === "sgk_exercises") {
         promptGoal = `Chuyên mục GIẢI BÀI TẬP CUỐI BÀI SGK & SBT CHUẨN LỜI GIẢI HAY (loigiaihay.com):
 - Trình bày lần lượt toàn bộ các bài tập cuối bài học trong SGK và Sách bài tập (SBT) của bộ sách ${textbook || "Kết nối tri thức"}.
@@ -3074,7 +3084,9 @@ ${sectionFilter}
 
 ${promptGoal}
 
-Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com), trình bày bằng Markdown rõ ràng, đẹp mắt, chia các đề mục rành mạch, dùng ký hiệu khoa học / công thức toán học chuẩn xác, dễ đọc trên cả điện thoại và máy tính.`;
+Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com), trình bày bằng Markdown rõ ràng, đẹp mắt, chia các đề mục rành mạch, dùng ký hiệu khoa học / công thức toán học chuẩn xác, dễ đọc trên cả điện thoại và máy tính.
+
+⚠️ RÀ SOÁT CUỐI (LÀM TRƯỚC KHI NGỪNG): đảm bảo đã có đủ (1) đầy đủ mọi mục I, II, III... của bài học, (2) giải hết mọi câu hỏi Khởi động / Hoạt động / Thảo luận / Luyện tập / Vận dụng trong từng mục, (3) trọn vẹn bài tập cuối bài SGK & SBT, (4) mục Ghi nhớ & mẹo. Độ dài không giới hạn — viết càng đầy đủ càng tốt. Nếu bài dài bạn ĐƯỢC PHÉP viết dài, tuyệt đối KHÔNG được cắt bớt mục hay tóm tắt lướt qua.`;
 
       const response = await generateContentWithFallback(aiClients, {
         contents: prompt,
