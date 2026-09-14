@@ -2974,6 +2974,11 @@ const next: SiteSettings = {
       } = req.body;
 
       const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
+      const isEnglish =
+        String(subject || "").toLowerCase().includes("tiếng anh") ||
+        String(subject || "").toLowerCase().includes("tieng anh") ||
+        String(subject || "").toLowerCase().includes("english") ||
+        String(subjectId || "").toLowerCase() === "anh";
       const examFocus =
         String(grade) === "9"
           ? "thi tuyển sinh vào lớp 10 (cấp Trung học cơ sở)"
@@ -3029,6 +3034,20 @@ C. PHẦN BÀI TẬP CUỐI BÀI (SGK & SBT):
 D. CUỐI BÀI: phần 💡 GHI NHỚ & MẸO LÀM BÀI (bẫy đề thi hay gặp, lưu ý quan trọng không để mất điểm).
 
 CẢNH BÁO: nếu bài học có 3-4 mục lớn thì phải có đủ 3-4 mục; chỉ soạn vài mục đầu là BÀI SOẠN LỖI.`;
+
+        // Môn TIẾNG ANH: luôn bổ sung phần TỪ VỰNG unit ngay đầu bài
+        if (isEnglish) {
+          promptGoal += `
+E. 🗣️ TỪ VỰNG TRỌNG TÂM CỦA UNIT (PHẦN BẮT BUỘC, ĐẶT NGAY ĐẦU BÀI SOẠN, sau tiêu đề ### Tên bài):
+   - Lập bảng Markdown đầy đủ toàn bộ từ vựng quan trọng trong unit (tối thiểu 20-30 từ), mỗi hàng gồm đúng 3 cột: Từ vựng | Phiên âm IPA | Nghĩa tiếng Việt.
+   - Phiên âm IPA viết chính xác theo chuẩn quốc tế, đặt trong /.../ (ví dụ /kəˈmjuːnɪti/).
+   - Ví dụ định dạng bảng:
+| Từ vựng | Phiên âm IPA | Nghĩa tiếng Việt |
+|---|---|---|
+| community | /kəˈmjuːnəti/ | cộng đồng |
+| lifestyle | /ˈlaɪfstaɪl/ | lối sống |
+   - Chỉ bảng từ vựng chính (đúng 3 cột) được đặt ngay đầu bài; các từ vựng khác lồng vào nội dung từng mục vẫn bình thường.`;
+        }
       } else if (noteStyle === "sgk_exercises") {
         promptGoal = `Chuyên mục GIẢI BÀI TẬP CUỐI BÀI SGK & SBT CHUẨN LỜI GIẢI HAY (loigiaihay.com):
 - Trình bày lần lượt toàn bộ các bài tập cuối bài học trong SGK và Sách bài tập (SBT) của bộ sách ${textbook || "Kết nối tri thức"}.

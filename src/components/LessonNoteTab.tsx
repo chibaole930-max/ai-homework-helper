@@ -14,6 +14,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { CurriculumBrowser } from './CurriculumBrowser';
 import { useAuth } from '../context/AuthContext';
 import { authHeaders } from '../lib/auth';
+import { EnglishVocabulary, extractVocabulary } from './EnglishVocabulary';
 import {
   Sparkles,
   BookOpen,
@@ -285,9 +286,14 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [mobileOpen, setMobileOpen] = useState<number | null>(1);
   const toggleStep = (step: number) =>
     setMobileOpen((prev) => (prev === step ? null : step));
-  // Nội dung bước: mobile chỉ hiện khi accordion mở, desktop luôn hiện (lg:block)
   const stepBodyCls = (step: number) =>
     mobileOpen === step ? 'block' : 'hidden lg:block';
+
+  // Môn Tiếng Anh: tách bảng từ vựng thành card phát âm riêng
+  const isEnglishSubject = currentSubject.id === 'anh';
+  const { words: vocabWords, cleaned: cleanedNoteContent } = isEnglishSubject && generatedNote
+    ? extractVocabulary(generatedNote)
+    : { words: [], cleaned: generatedNote || '' };
 
   const renderStepHeader = (
     step: number,
@@ -886,7 +892,13 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                   </div>
                 ) : (
                   <div className="prose prose-slate max-w-none">
-                    <MarkdownRenderer content={generatedNote} />
+                    {isEnglishSubject && vocabWords.length > 0 && (
+                      <EnglishVocabulary
+                        words={vocabWords}
+                        lessonTitle={lessonTitle}
+                      />
+                    )}
+                    <MarkdownRenderer content={cleanedNoteContent} />
                   </div>
                 )
               ) : (
