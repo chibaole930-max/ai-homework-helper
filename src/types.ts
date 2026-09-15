@@ -28,7 +28,8 @@ export type NoteStyle =
   | 'sgk_exercises'
   | 'formula_summary'
   | 'mindmap'
-  | 'exam_prep';
+  | 'exam_prep'
+  | 'cornell';
 
 export type LoigiaihaySection =
   | 'all'

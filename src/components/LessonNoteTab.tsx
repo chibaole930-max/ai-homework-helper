@@ -40,6 +40,7 @@ import {
   Loader2,
   Send,
   Crown,
+  NotebookPen,
 } from 'lucide-react';
 
 interface LessonNoteTabProps {
@@ -725,6 +726,24 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
                 </div>
                 <p className="text-[11px] text-slate-500 leading-tight">
                   Trắc nghiệm nhiều lựa chọn, đúng/sai, trả lời ngắn
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setNoteStyle('cornell')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  noteStyle === 'cornell'
+                    ? 'border-teal-600 bg-teal-50/80 ring-1 ring-teal-500 text-teal-950'
+                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold text-xs mb-1">
+                  <NotebookPen className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Vở Ghi Cornell 5R</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-tight">
+                  Ghi chú 2 cột + ô tóm tắt, ôn nhanh theo chu kỳ 1-3-7 ngày
                 </p>
               </button>
             </div>

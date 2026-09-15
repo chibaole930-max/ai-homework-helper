@@ -13,6 +13,8 @@ import { SavedNotesTab } from './components/SavedNotesTab';
 import { PresetLibraryTab } from './components/PresetLibraryTab';
 import { HocBaTab } from './components/HocBaTab';
 import { LoTrinhTab } from './components/LoTrinhTab';
+import { FlashcardsTab } from './components/FlashcardsTab';
+import { StudyTipsTab } from './components/StudyTipsTab';
 import AdminTab from './components/AdminTab';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './components/AuthModal';
@@ -351,13 +353,15 @@ if (isAdmin) {
     );
   }
 
-  const FEATURE_TITLES: Record<OpenFeature, string> = {
+const FEATURE_TITLES: Record<OpenFeature, string> = {
 notes: 'Soạn Bài Ghi',
     solver: 'Giải Bài Tập',
     presets: 'Kho Bài Mẫu',
     saved: 'Vở Ghi',
     transcript: 'Sổ Học Bạ',
     path: 'Lộ Trình Học Tập',
+    flashcards: 'Thẻ Học Thông Minh',
+    tips: 'Mẹo Học Tập',
   };
 
   const renderFeature = (feature: OpenFeature) => {
@@ -413,6 +417,10 @@ case 'saved':
         return <HocBaTab subjects={subjects} grade={grade} />;
       case 'path':
         return <LoTrinhTab grade={grade} />;
+      case 'flashcards':
+        return <FlashcardsTab savedItems={savedItems} />;
+      case 'tips':
+        return <StudyTipsTab />;
     }
   };
 

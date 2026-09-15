@@ -3073,6 +3073,13 @@ E. 🗣️ TỪ VỰNG TRỌNG TÂM CỦA UNIT (PHẦN BẮT BUỘC, ĐẶT NGAY
 - Phân tích cấu trúc dạng bài trong đề thi Tốt nghiệp THPT mới (GDPT 2018).
 - Bộ câu hỏi trắc nghiệm gồm: 4 câu trắc nghiệm nhiều lựa chọn, 1 câu trắc nghiệm Đúng/Sai (4 ý a, b, c, d), 1 câu trả lời ngắn.
 - Lời giải chi tiết chuẩn phong cách Lời Giải Hay (có phương pháp giải, giải thích cặn kẽ tại sao đúng/sai).`;
+      } else if (noteStyle === "cornell") {
+        promptGoal = `Soạn bài học theo VỞ GHI CORNELL 5R (phương pháp ghi chú nổi tiếng của Đại học Cornell, chuẩn Lời Giải Hay):
+- Bố cục 2 cột rõ ràng:
+  + CỘT TRÁI (hẹp): các TỪ KHÓA / CÂU HỎI GỢI NHỚ / khái niệm chính — ngắn gọn, súc tích để tự kiểm tra khi che phần bên phải.
+  + CỘT PHẢI (rộng): nội dung lý thuyết chi tiết, công thức, lời giải câu hỏi Khởi động / Hoạt động / Luyện tập / Vận dụng theo đúng SGK.
+- Dưới cùng mỗi phần lớn: ô "TÓM TẮT 5R" gồm 5 bước: Record (ghi lại), Reduce (cô đọng từ khóa), Recite (nói lại/tự trình bày), Reflect (suy ngẫm - liên hệ bài học), Review (lịch ôn lại khuyến nghị: sau 1 ngày → 3 ngày → 7 ngày).
+- Trình bày bằng bảng Markdown để hiển thị rõ 2 cột (cột trái từ khóa, cột phải nội dung), cuối mỗi mục có dòng 💡 GHI NHỚ & MẸO LÀM BÀI.`;
       }
 
       // If specific Loigiaihay section was requested

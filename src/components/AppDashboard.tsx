@@ -8,12 +8,22 @@ import {
   GraduationCap,
   ClipboardList,
   Route,
+  BrainCircuit,
+  Lightbulb,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Stagger, StaggerItem } from './Motion';
 import { GradeId, SavedStudyItem, SubjectInfo } from '../types';
 
-export type OpenFeature = 'notes' | 'solver' | 'presets' | 'saved' | 'transcript' | 'path';
+export type OpenFeature =
+  | 'notes'
+  | 'solver'
+  | 'presets'
+  | 'saved'
+  | 'transcript'
+  | 'path'
+  | 'flashcards'
+  | 'tips';
 
 interface AppDashboardProps {
   grade: GradeId;
@@ -214,6 +224,30 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       desc: 'Khai mục tiêu của bạn, AI xây lộ trình học từng môn, từng giai đoạn phù hợp.',
       chips: ['Mục tiêu', 'Cá nhân hóa', 'AI'],
       cta: 'Tạo lộ trình',
+    },
+    {
+      feature: 'flashcards',
+      number: '7',
+      title: 'Thẻ Học Thông Minh',
+      subtitle: 'Flashcards + lặp lại ngắt quãng',
+      icon: BrainCircuit,
+      accentBar: 'bg-gradient-to-r from-violet-600 to-purple-500',
+      iconBg: 'bg-gradient-to-tr from-violet-600 to-purple-500',
+      desc: 'Tạo thẻ từ bài ghi Tiếng Anh, luyện lật thẻ và ôn lại đúng lịch 1-3-7-14-30 ngày để nhớ lâu.',
+      chips: ['Từ vựng', 'Lật thẻ', 'Nhớ lâu'],
+      cta: 'Học ngay',
+    },
+    {
+      feature: 'tips',
+      number: '8',
+      title: 'Mẹo Học Tập',
+      subtitle: 'Phương pháp học hiệu quả',
+      icon: Lightbulb,
+      accentBar: 'bg-gradient-to-r from-teal-500 to-emerald-500',
+      iconBg: 'bg-gradient-to-tr from-teal-500 to-emerald-500',
+      desc: 'Cornell 5R, ghi nhớ ngắt quãng, sơ đồ tư duy, cung điện trí nhớ — bí kíp học siêu tốc.',
+      chips: ['Cornell', 'Mindmap', 'Active recall'],
+      cta: 'Xem mẹo',
     },
   ];
 

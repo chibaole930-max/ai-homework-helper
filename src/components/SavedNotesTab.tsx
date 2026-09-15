@@ -16,6 +16,7 @@ import {
   Printer,
   Download,
   Filter,
+  CalendarClock,
 } from 'lucide-react';
 
 interface SavedNotesTabProps {
@@ -25,6 +26,29 @@ interface SavedNotesTabProps {
   onClearAll: () => void;
   subjects: SubjectInfo[];
   gradeLabel: string;
+}
+
+function daysSinceSaved(dateStr: string): number {
+  const parts = (dateStr || '').split('/');
+  if (parts.length !== 3) return 0;
+  const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  if (isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
+
+function reviewReminder(dateStr: string): { text: string; cls: string } {
+  const d = daysSinceSaved(dateStr);
+  if (d >= 30)
+    return { text: 'Đã ôn đủ chu kỳ 30 ngày', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+  if (d >= 14)
+    return { text: 'Ôn lần cuối: sau 30 ngày', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+  if (d >= 7)
+    return { text: 'Ôn lần 4: sau 14 ngày', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+  if (d >= 3)
+    return { text: 'Ôn lần 3: sau 7 ngày', cls: 'bg-violet-50 text-violet-700 border-violet-200' };
+  if (d >= 1)
+    return { text: 'Ôn lần 2: sau 3 ngày', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+  return { text: 'Ôn lần 1: sau 1 ngày', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
 }
 
 export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
@@ -286,12 +310,18 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
                 </div>
 
                 {/* Card Footer */}
-                <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span className="flex items-center gap-1 text-[11px]">
+                <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 text-xs text-slate-500 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-[11px]">
                     <Calendar className="w-3 h-3 text-slate-400" />
                     {item.date}
                   </span>
-
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${reviewReminder(item.date).cls}`}
+                    title="Lịch ôn tập ngắt quãng 1-3-7-14-30 ngày"
+                  >
+                    <CalendarClock className="w-3 h-3" />
+                    {reviewReminder(item.date).text}
+                  </span>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setActiveItem(item)}
