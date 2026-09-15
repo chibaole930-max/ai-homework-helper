@@ -2173,7 +2173,10 @@ async function readSiteSettings(): Promise<SiteSettings> {
   }
   cachedSiteSettings = {
     maintenance: { enabled: false, message: "", modules: {} },
-    announcement: { enabled: false, text: "" },
+    announcement: {
+      enabled: true,
+      text: "📢 Bản cập nhật mới – 4 tính năng vừa ra mắt:\n\n🧠 Thẻ Học Thông Minh: Tự tạo bộ thẻ từ vựng Tiếng Anh từ bài học, lật thẻ và ôn lại theo lịch 1→3→7→14→30 ngày.\n\n💡 Mẹo Học Tập: 8 phương pháp học hiệu quả (Cornell 5R, active recall, mindmap, cung điện trí nhớ…) viết tiếng Việt cho học sinh.\n\n📝 Vở Ghi Cornell 5R: Kiểu soạn bài mới – 2 cột từ khóa + nội dung, ôn thi không cần đọc lại cả tập vở.\n\n🔔 Nhắc ôn tập thông minh: Mỗi bài lưu hiện lịch ôn 1-3-7-14-30 ngày tự động.\n\nVào thử ngay – tất cả đều miễn phí! 🇻🇳",
+    },
     donate: { enabled: false, qrImage: "", note: "" },
     ai: { geminiKey: "", keys: [] },
     freeUsageLimit: 2,
