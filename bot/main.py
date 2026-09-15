@@ -21,6 +21,7 @@ from telegram.ext import (
 from config import DATA_DIR, get, load_config
 import gemini
 import opencode_bridge
+import chat_bridge
 
 BOT_START_TIME = time.time()
 
@@ -31,6 +32,10 @@ STORED_PROMPT: dict = {}
 SESSION_TITLES: dict = {}
 EDIT_STATE: dict = {}
 LAST_MODE: dict = {}
+
+CHAT_MODE: set = set()
+CHAT_SETUP: dict = {}
+CHAT_START: dict = {}
 
 
 def bot_command(command: str, description: str):
@@ -177,6 +182,128 @@ async def cmd_dangky(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Đăng ký thành công! Bạn có thể yêu cầu sửa code.")
 
 
+def is_authorized_for_admin(chat_id) -> bool:
+    from auto_updater.config import Config
+    return str(chat_id) == Config.TELEGRAM_CHAT_ID
+
+
+@bot_command("up_status", "Trạng thái auto-updater")
+async def cmd_up_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        from auto_updater.agent import agent
+        status = await agent.get_status()
+        state = "🟢 Running" if status["running"] else "🔴 Stopped"
+        msg = (
+            f"🤖 AUTO-UPDATER\n\n"
+            f"🔄 Trạng thái: {state}\n"
+            f"📦 Updates đã chạy: {status['updates_count']}\n"
+            f"⏰ Lần check tiếp: {status['next_check']}\n"
+            f"🔍 Lĩnh vực: {status['focus']}"
+        )
+        await update.message.reply_text(msg)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Lỗi: {type(e).__name__}: {e}")
+
+
+@bot_command("up_stop", "Dừng auto-updater")
+async def cmd_up_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if not is_authorized_for_admin(chat_id):
+        await update.message.reply_text("🔒 Chỉ admin mới dùng được lệnh này.")
+        return
+    try:
+        from auto_updater.agent import agent
+        await agent.stop()
+        await update.message.reply_text("🛑 Đã gửi lệnh dừng auto-updater!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Lỗi: {type(e).__name__}: {e}")
+
+
+@bot_command("up_resume", "Tiếp tục auto-updater")
+async def cmd_up_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if not is_authorized_for_admin(chat_id):
+        await update.message.reply_text("🔒 Chỉ admin mới dùng được lệnh này.")
+        return
+    try:
+        from auto_updater.agent import agent
+        if not agent.running:
+            asyncio.create_task(agent.start())
+            await update.message.reply_text("▶️ Đã bắt đầu auto-updater!")
+        else:
+            await update.message.reply_text("🟢 Auto-updater đang chạy rồi.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Lỗi: {type(e).__name__}: {e}")
+
+
+@bot_command("up_force", "Force check ngay lập tức")
+async def cmd_up_force(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if not is_authorized_for_admin(chat_id):
+        await update.message.reply_text("🔒 Chỉ admin mới dùng được lệnh này.")
+        return
+    try:
+        from auto_updater.agent import agent
+        await update.message.reply_text("⏳ Đang check updates ngay...")
+        await agent.force_check()
+        await update.message.reply_text("✅ Đã check xong!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Lỗi: {type(e).__name__}: {e}")
+
+
+@bot_command("chat", "Bắt đầu trò chuyện 2 chiều với OpenCode")
+async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if not is_authorized(chat_id):
+        await update.message.reply_text("🔒 Bạn cần /dangky trước để chat với OpenCode.")
+        return
+    CHAT_MODE.add(chat_id)
+    CHAT_START[chat_id] = time.time()
+    await chat_bridge.bridge.new_session(chat_id)
+    await update.message.reply_text(
+        "💬 <b>Đã bật chế độ chat 2 chiều với OpenCode!</b>\n\n"
+        "• Nhắn tin bình thường = gửi tới OpenCode\n"
+        "• OpenCode hỏi = tôi sẽ chuyển câu hỏi tới bạn\n"
+        "• Trả lời trực tiếp = gửi ngược lại OpenCode\n\n"
+        "Dùng <b>/exit</b> để thoát.",
+        parse_mode="HTML",
+    )
+
+
+@bot_command("exit", "Thoát chế độ chat với OpenCode")
+async def cmd_exit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id in CHAT_MODE:
+        CHAT_MODE.discard(chat_id)
+        await chat_bridge.bridge.clear(chat_id)
+        await update.message.reply_text("👋 Đã thoát chế độ chat với OpenCode.")
+    else:
+        await update.message.reply_text("Bạn chưa ở trong chế độ chat. Dùng /chat.")
+
+
+async def chat_feedback(chat_id: str, question: dict):
+    """Called by ChatBridge when OpenCode asks a question via SSE."""
+    chat_bridge.bridge._last_question.update({chat_id: question})
+    title = question.get("title") or "OpenCode đang hỏi"
+    await application_send(chat_id, f"❓ <b>OpenCode hỏi:</b>\n{title}\n\n📝 Hãy trả lời trực tiếp để gửi ngược lại.")
+
+
+application_send_bot = None
+
+
+def bind_bot(bot):
+    global application_send_bot
+    application_send_bot = bot
+
+
+async def application_send(chat_id: str, text: str):
+    if application_send_bot is not None:
+        try:
+            await application_send_bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+        except Exception:
+            pass
+
+
 async def plain_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = (update.message.text or "").strip()
@@ -188,10 +315,37 @@ async def plain_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_result(update.message, chat_id, text, is_authorized(chat_id) and looks_like_code_request(text))
             return
 
+        if chat_id in CHAT_MODE:
+            await handle_chat_message(update.message, chat_id, text)
+            return
+
         use_code = is_authorized(chat_id) and looks_like_code_request(text)
         await send_result(update.message, chat_id, text, use_code)
     except Exception as e:
         await update.message.reply_text(f"⚠️ Có lỗi xảy ra. {type(e).__name__}")
+
+
+async def handle_chat_message(message, chat_id: int, text: str):
+    """Route a normal message through OpenCode two-way chat bridge."""
+    # User is answering a pending question from OpenCode.
+    if chat_bridge.bridge.is_responding(chat_id):
+        await message.reply_text("⏳ Đang gửi câu trả lời tới OpenCode...")
+        result = await chat_bridge.bridge.answer_question(chat_id, text)
+    else:
+        await message.reply_text("⏳ Đang trao đổi với OpenCode...")
+        result = await chat_bridge.bridge.send_message(chat_id, text)
+
+    if result["type"] == "text":
+        await message.reply_text(result["text"][:4096])
+    elif result["type"] == "question":
+        title = result.get("title", "OpenCode đang hỏi")
+        await message.reply_text(
+            f"❓ <b>OpenCode hỏi:</b>\n{title}\n\n"
+            f"Trả lời trực tiếp tin nhắn này.",
+            parse_mode="HTML",
+        )
+    elif result["type"] == "error":
+        await message.reply_text(result.get("text", "⚠️ Lỗi trao đổi với OpenCode."))
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -268,9 +422,11 @@ def main():
         return
 
     application = Application.builder().token(token).build()
+    bind_bot(application.bot)
 
     async def post_init(app: Application):
         await register_commands(app)
+        await chat_bridge.bridge.start_monitor(chat_feedback)
 
     application.post_init = post_init
 
