@@ -3,8 +3,8 @@ services:
     name: ai-homework-helper
     runtime: node
     plan: free
-    buildCommand: bun install && bun run build
-    startCommand: bun run start
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: DATABASE_URL
         sync: false
