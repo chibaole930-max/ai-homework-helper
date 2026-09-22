@@ -1,0 +1,16 @@
+name = "ai-homework-helper-worker"
+main = "worker.ts"
+compatibility_date = "2026-09-20"
+compatibility_flags = ["nodejs_compat"]
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "1c1546a69d8b43e3865ef4419775596d"
+
+[assets]
+directory = "dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[vars]
+NODE_ENV = "production"

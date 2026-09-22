@@ -11,12 +11,15 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
-    server: {
+server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modifyâ file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Cho phép truy cập qua domain riêng khi chạy qua Vite middleware
+      // (kể cả khi NODE_ENV chưa được set = production, tránh lỗi "Blocked request")
+      allowedHosts: ['studyez.us.ci', '.studyez.us.ci', 'localhost'],
     },
   };
 });

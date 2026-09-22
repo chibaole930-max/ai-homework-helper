@@ -4,7 +4,6 @@ import fs from "fs";
 import crypto from "crypto";
 import webpush from "web-push";
 import { Pool } from "pg";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { PRESET_LESSON_NOTES } from "./src/data/presets";
@@ -40,19 +39,31 @@ interface CommunityPresetItem {
 
 const COMMUNITY_DATA_FILE = path.join(process.cwd(), "data", "community-presets.json");
 
-// Kết nối Postgres nếu có DATABASE_URL (Supabase / Neon miễn phí)
-function createPgPool(): Pool | null {
-  const url = process.env.DATABASE_URL;
+// Kết nối Postgres nếu có DATABASE_URL (Supabase / Neon miễn phí).
+// urlOverride: trên Cloudflare Workers dùng Hyperdrive binding (env.HYPERDRIVE.connectionString),
+// vì Workers không thể tự bắt tay TLS với CA riêng của Supabase qua cloudflare:sockets.
+function createPgPool(urlOverride?: string): Pool | null {
+  const url = urlOverride ?? process.env.DATABASE_URL;
   if (!url) return null;
-  return new Pool({
+  const pool = new Pool({
     connectionString: url,
-    ssl: url.includes("localhost") || url.includes("127.0.0.1")
+    // Workers: isolate ngủ thì socket TCP bị đóng. Giữ pool tiny + recycle nhanh
+    // để mỗi request gần như mở connection mới qua Hyperdrive (proxy giữ origin warm).
+    max: 1,
+    idleTimeoutMillis: 1500,
+    connectionTimeoutMillis: 15000,
+    ssl: url.includes("localhost") || url.includes("127.0.0.1") || url.includes("hyperdrive.local")
       ? false
       : { rejectUnauthorized: false },
   });
+  pool.on("error", () => {
+    /* client bị đóng khi isolate sleep - pool tự tạo client mới */
+  });
+  return pool;
 }
 
-const pgPool = createPgPool();
+// Khởi tạo lazy bên trong buildApp để kịp nhận HYPERDRIVE binding từ fetch handler
+let pgPool: Pool | null = null;
 
 function rowToPreset(row: any): CommunityPresetItem {
   return {
@@ -169,13 +180,20 @@ async function ensureCommunityTable(pool: Pool) {
   }
 }
 
-if (pgPool) {
-  ensureCommunityTable(pgPool).catch((err) => {
-    console.error("[Community] Lỗi khởi tạo bảng PostgreSQL:", err);
-  });
-  ensurePendingTable(pgPool).catch((err) => {
-    console.error("[Pending] Lỗi khởi tạo bảng PostgreSQL:", err);
-  });
+// Khởi tạo bảng PostgreSQL. Gọi bên trong buildApp (handler) để tránh I/O ngầm
+// ở global scope — Cloudflare Workers cấm async I/O lúc module load.
+async function initDBTables(pool: Pool) {
+  await Promise.all([
+    ensureCommunityTable(pool).catch((err) => {
+      console.error("[Community] Lỗi khởi tạo bảng PostgreSQL:", err);
+    }),
+    ensurePendingTable(pool).catch((err) => {
+      console.error("[Pending] Lỗi khởi tạo bảng PostgreSQL:", err);
+    }),
+    ensureUsageTable(pool).catch((err) => {
+      console.error("[Usage] Lỗi khởi tạo bảng usage_daily:", err);
+    }),
+  ]);
 }
 
 function communitySeedList(): CommunityPresetItem[] {
@@ -2250,12 +2268,6 @@ function requireAdmin(
   next();
 }
 
-if (pgPool) {
-  ensureUsageTable(pgPool).catch((err) => {
-    console.error("[Usage] Lỗi khởi tạo bảng usage_daily:", err);
-  });
-}
-
 // Gửi push tới toàn bộ subscriptions (broadcast). Trả về số gửi thành công.
 async function sendPushToAll(title: string, body: string): Promise<number> {
   const subs = await readPushSubscriptions();
@@ -2307,17 +2319,21 @@ async function maybeSendScheduledPush() {
   }
 }
 
-async function startServer() {
+export async function buildApp(options?: { serveStatic?: boolean; databaseUrl?: string }) {
   const app = express();
   const PORT = 3000;
 
+  if (!pgPool) {
+    pgPool = createPgPool(options?.databaseUrl);
+  }
   initWebPush();
   // Cron gửi push định kỳ (kiểm tra mỗi phút, tự theo intervalHours)
   setInterval(() => { maybeSendScheduledPush().catch(() => {}); }, 60 * 1000);
 
   // Nền tảng đo số người online theo mốc thời gian (admin)
   loadOnlineHistory();
-  setInterval(sampleOnline, 60000).unref();
+  const onlineTimer = setInterval(sampleOnline, 60000);
+  try { (onlineTimer as any).unref?.(); } catch {}
 
   // Render chạy sau proxy CDN/LB nên bật trust proxy để lấy đúng IP người dùng
   app.set("trust proxy", true);
@@ -2325,6 +2341,11 @@ async function startServer() {
   // Increase payload limit for base64 image uploads of homework photos
   app.use(express.json({ limit: "25mb" }));
   app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+
+  // Khởi tạo các bảng PostgreSQL khi app được build (trong handler, không global scope)
+  if (pgPool) {
+    await initDBTables(pgPool);
+  }
 
   // Health check
   app.get("/api/health", (_req, res) => {
@@ -3676,24 +3697,41 @@ Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
+  // Static + SPA fallback (chỉ dùng cho Node/Render; Cloudflare Pages lo phần static)
+  if (options?.serveStatic !== false) {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    const hasBuild = fs.existsSync(path.join(distPath, "index.html"));
+    if (process.env.NODE_ENV !== "production" && !hasBuild) {
+      // Dynamic import bằng chuỗi để bundler của Cloudflare không nhét vite vào bundle
+      const modName = "vi" + "te";
+      const { createServer: createViteServer } = await import(modName);
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
+  return app;
+}
+
+// Node/Render entry: tự build app + listen khi chạy trực tiếp
+async function startServer() {
+  const app = await buildApp();
+  const PORT = Number(process.env.PORT || 3000);
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer();
+// Chỉ tự start khi chạy trực tiếp trên Node (đặt APP_AUTOSTART=1).
+// Khi Cloudflare import buildApp vào Pages Function thì không listen.
+if (process.env.APP_AUTOSTART === "1") {
+  startServer();
+}
