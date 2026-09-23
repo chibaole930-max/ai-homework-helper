@@ -445,7 +445,7 @@ case 'saved':
   if (siteStatus?.maintenance.enabled) {
     const featureBlocked = openFeature !== null && openFeature !== 'saved';
 return (
-      <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden relative">
+      <div className="h-dvh flex flex-col bg-slate-50 text-slate-100 font-sans overflow-hidden relative z-10">
         <FloatingBackground />
         <Navbar
           grade={grade}
@@ -527,7 +527,7 @@ return (
   }
 
 return (
-    <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 relative">
+    <div className="h-dvh flex flex-col bg-slate-50 text-slate-100 font-sans overflow-hidden selection:bg-indigo-300/30 selection:text-white relative z-10">
       <FloatingBackground />
       <Navbar
         grade={grade}

@@ -1,72 +1,398 @@
 @import "tailwindcss";
 
+/* =====================================================================
+   STUDYEZ — PREMIUM DARK / FUTURISTIC THEME
+   Chiến lược: override trực tiếp các utility sáng của Tailwind thành
+   tông dark/glass — KHÔNG sửa từng component.
+   ===================================================================== */
+
 @layer base {
+  :root {
+    color-scheme: dark;
+    --font-display: "Space Grotesk", "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, sans-serif;
+    --font-body: "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    background-color: #eef2f7;
-    color-scheme: light;
+    background-color: #04060d;
+    background-image:
+      radial-gradient(1100px 500px at 50% -10%, rgba(79, 70, 229, 0.16), transparent 60%),
+      radial-gradient(900px 600px at 90% 20%, rgba(8, 145, 178, 0.1), transparent 55%),
+      radial-gradient(800px 700px at 5% 40%, rgba(139, 92, 246, 0.09), transparent 55%);
+    background-attachment: fixed;
+    color: #e8edf6;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.35);
+    color: #fff;
+  }
+
+  /* Thanh cuộn futuristic */
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(8, 145, 178, 0.5));
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(129, 140, 248, 0.8), rgba(34, 211, 238, 0.8));
+    background-clip: padding-box;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.5) transparent;
   }
 }
 
-@keyframes announce-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92) translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+/* =====================================================================
+   INVERT MÀU SÁNG -> DARK (áp toàn cục, không sửa JSX)
+   ===================================================================== */
+
+/* Nền trắng -> glass tối */
+.bg-white {
+  background-color: rgba(255, 255, 255, 0.045) !important;
 }
-.animate-announce-in {
-  animation: announce-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+.bg-white\/95 {
+  background-color: rgba(8, 12, 24, 0.8) !important;
+}
+.bg-white\/90,
+.bg-white\/85,
+.bg-white\/80 {
+  background-color: rgba(10, 15, 28, 0.78) !important;
+}
+.bg-white\/70,
+.bg-white\/60,
+.bg-white\/50 {
+  background-color: rgba(15, 22, 40, 0.6) !important;
+}
+.bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+.bg-white\/5 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
-@keyframes announce-backdrop {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Nền slate sáng -> panel tối */
+.bg-slate-50 {
+  background-color: #04060d !important;
 }
-.animate-announce-backdrop {
-  animation: announce-backdrop 0.25s ease-out both;
+.bg-slate-100 {
+  background-color: rgba(255, 255, 255, 0.055) !important;
 }
-
-.scrollbar-none {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+.bg-slate-200 {
+  background-color: rgba(255, 255, 255, 0.12) !important;
 }
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+.bg-slate-300 {
+  background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Skeleton shimmer động (thay cho pulse tĩnh) */
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+/* Nền tint nhạt -> tint tối */
+.bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.14) !important;
 }
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(148, 163, 184, 0.15) 25%,
-    rgba(148, 163, 184, 0.38) 50%,
-    rgba(148, 163, 184, 0.15) 75%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+.bg-indigo-100 {
+  background-color: rgba(99, 102, 241, 0.22) !important;
+}
+.bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+.bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+}
+.bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+.bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+.bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.1) !important;
+}
+.bg-rose-100 {
+  background-color: rgba(244, 63, 94, 0.18) !important;
+}
+.bg-sky-50 {
+  background-color: rgba(14, 165, 233, 0.1) !important;
+}
+.bg-violet-50 {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+}
+.bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+.bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+.bg-zinc-50 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
-/* Gradient chữ chủ đạo xanh - cam cho điểm nhấn */
+/* Text tối -> sáng */
+.text-slate-900 {
+  color: #eef2fa !important;
+}
+.text-slate-800 {
+  color: #d7deea !important;
+}
+.text-slate-700 {
+  color: #b6c2d4 !important;
+}
+.text-slate-600 {
+  color: #93a3ba !important;
+}
+.text-slate-500 {
+  color: #7b8aa0 !important;
+}
+.text-slate-400 {
+  color: #64748b !important;
+}
+.text-slate-300 {
+  color: #cbd5e1 !important;
+}
+.text-gray-900 {
+  color: #eef2fa !important;
+}
+.text-gray-800 {
+  color: #d7deea !important;
+}
+.text-gray-700 {
+  color: #b6c2d4 !important;
+}
+.text-gray-600 {
+  color: #93a3ba !important;
+}
+.text-gray-500 {
+  color: #7b8aa0 !important;
+}
+.text-zinc-900,
+.text-zinc-800,
+.text-zinc-700 {
+  color: #eef2fa !important;
+}
+.text-zinc-600,
+.text-zinc-500 {
+  color: #93a3ba !important;
+}
+
+/* Border sáng -> viền tối mờ */
+.border-slate-200 {
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+.border-slate-200\/70 {
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+.border-slate-200\/50 {
+  border-color: rgba(148, 163, 184, 0.09) !important;
+}
+.border-slate-300 {
+  border-color: rgba(148, 163, 184, 0.26) !important;
+}
+.border-slate-100 {
+  border-color: rgba(148, 163, 184, 0.1) !important;
+}
+.border-gray-200 {
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+.border-gray-300 {
+  border-color: rgba(148, 163, 184, 0.26) !important;
+}
+.border-amber-200 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+.border-amber-300 {
+  border-color: rgba(245, 158, 11, 0.42) !important;
+}
+.border-emerald-200,
+.border-green-200 {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+.border-rose-200,
+.border-red-200 {
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+.border-indigo-200 {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+
+/* Primary button luôn sáng + hover glow */
+.bg-indigo-600,
+.bg-blue-600 {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0)) !important;
+}
+.bg-indigo-600:hover,
+.bg-blue-600:hover {
+  box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.7);
+}
+
+.text-indigo-700,
+.text-indigo-600 {
+  color: #818cf8 !important;
+}
+.text-amber-600,
+.text-amber-700 {
+  color: #fbbf24 !important;
+}
+.text-emerald-600,
+.text-green-600 {
+  color: #34d399 !important;
+}
+.text-rose-600,
+.text-red-600 {
+  color: #fb7185 !important;
+}
+.text-sky-600 {
+  color: #38bdf8 !important;
+}
+.text-violet-600 {
+  color: #a78bfa !important;
+}
+.text-blue-600 {
+  color: #60a5fa !important;
+}
+
+.shadow-indigo-100,
+.shadow-indigo-200,
+.shadow-blue-100,
+.shadow-slate-200,
+.shadow-gray-200 {
+  box-shadow: 0 8px 24px -12px rgba(79, 70, 229, 0.35) !important;
+}
+.shadow-indigo-500\/20 {
+  box-shadow: 0 12px 32px -12px rgba(99, 102, 241, 0.5) !important;
+}
+
+/* =====================================================================
+   TYPOGRAPHY HIỆN ĐẠI
+   ===================================================================== */
+.font-display {
+  font-family: var(--font-display);
+}
+.font-extrabold,
+.font-black {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+/* Gradient chữ chủ đạo (dark-tuned) */
 .text-gradient-brand {
-  background: linear-gradient(90deg, #2563eb, #0891b2 45%, #ea580c);
+  background: linear-gradient(90deg, #818cf8, #22d3ee 45%, #a78bfa 90%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* =====================================================================
+   MICRO-INTERACTIONS
+   ===================================================================== */
+@media (hover: hover) {
+  /* Card nào cũng có phản hồi nhẹ */
+  main [class*="rounded-2xl"] {
+    transition:
+      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.25s ease,
+      border-color 0.25s ease;
+  }
+  main [class*="rounded-2xl"].bg-white:hover {
+    transform: translateY(-2px);
+    border-color: rgba(129, 140, 248, 0.4);
+    box-shadow: 0 16px 44px -16px rgba(79, 70, 229, 0.45);
+  }
+  main button {
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.2s ease,
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+  main button:hover {
+    box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.6);
+  }
+  main button:active {
+    transform: scale(0.97);
+  }
+}
+
+/* =====================================================================
+   BACKGROUND FX LỚP (FloatingBackground render DOM, CSS này tạo hiệu ứng)
+   ===================================================================== */
+.bgfx-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
+}
+
+.bgfx-orb {
+  filter: blur(90px);
+  will-change: transform;
+}
+.bgfx-orb-a {
+  background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.5), transparent 65%);
+  animation: orb-drift-a 26s ease-in-out infinite alternate;
+}
+.bgfx-orb-b {
+  background: radial-gradient(circle at 60% 40%, rgba(8, 145, 178, 0.42), transparent 65%);
+  animation: orb-drift-b 32s ease-in-out infinite alternate;
+}
+.bgfx-orb-c {
+  background: radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.36), transparent 65%);
+  animation: orb-drift-c 38s ease-in-out infinite alternate;
+}
+
+@keyframes orb-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6%, 8%, 0) scale(1.12); }
+}
+@keyframes orb-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-7%, -6%, 0) scale(0.96); }
+}
+@keyframes orb-drift-c {
+  from { transform: translate3d(0, 0, 0) scale(0.95); }
+  to   { transform: translate3d(5%, -7%, 0) scale(1.15); }
+}
+
+.bgfx-particle {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 35%, #fff, rgba(148, 163, 184, 0.4));
+  box-shadow: 0 0 8px 1px rgba(148, 163, 184, 0.35);
+  pointer-events: none;
+  animation: particle-float linear infinite;
+}
+@keyframes particle-float {
+  0%   { transform: translateY(0) translateX(0); opacity: var(--p-op, 0.5); }
+  50%  { transform: translateY(-26px) translateX(8px); opacity: calc(var(--p-op, 0.5) * 0.6); }
+  100% { transform: translateY(0) translateX(0); opacity: var(--p-op, 0.5); }
+}
+
+/* Skeleton shimmer dark-tuned */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.09) 25%,
+    rgba(148, 163, 184, 0.24) 50%,
+    rgba(148, 163, 184, 0.09) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
 /* Đệm an toàn dưới cùng để nút sticky không che nội dung trên mobile */
@@ -80,83 +406,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* ===== Background động: icon học tập bay lơ lửng ===== */
-.bg-floater {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--floater-color, #2563eb);
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  will-change: transform;
-}
-
-/* Quỹ đạo chậm: di chuyển + xoay nhẹ, mỗi variant một hướng khác nhau */
-@keyframes floater-a {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  25% {
-    transform: translate(14px, -18px) rotate(6deg);
-  }
-  50% {
-    transform: translate(26px, 8px) rotate(-4deg);
-  }
-  75% {
-    transform: translate(10px, 22px) rotate(10deg);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-}
-
-@keyframes floater-b {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  30% {
-    transform: translate(-18px, 12px) rotate(-8deg);
-  }
-  60% {
-    transform: translate(-6px, -24px) rotate(5deg);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-}
-
-@keyframes floater-c {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  25% {
-    transform: translate(20px, 14px) rotate(9deg);
-  }
-  55% {
-    transform: translate(-14px, 20px) rotate(-6deg);
-  }
-  80% {
-    transform: translate(-22px, -10px) rotate(3deg);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-}
-
-.bg-floater-a {
-  animation-name: floater-a;
-}
-.bg-floater-b {
-  animation-name: floater-b;
-}
-.bg-floater-c {
-  animation-name: floater-c;
-}
-
 /* Tôn trọng người dùng giảm chuyển động */
 @media (prefers-reduced-motion: reduce) {
-  .bg-floater {
-    animation: none;
+  .bgfx-orb-a,
+  .bgfx-orb-b,
+  .bgfx-orb-c,
+  .bgfx-particle {
+    animation: none !important;
+  }
+  html {
+    scroll-behavior: auto;
   }
 }
