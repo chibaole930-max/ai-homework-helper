@@ -63,22 +63,22 @@
    INVERT MÀU SÁNG -> DARK (áp toàn cục, không sửa JSX)
    ===================================================================== */
 
-/* Nền trắng -> glass tối */
+/* Nền trắng -> bề mặt tối bán đặc (đọc rõ, vẫn giữ chút glass) */
 .bg-white {
-  background-color: rgba(255, 255, 255, 0.045) !important;
+  background-color: rgba(15, 22, 38, 0.9) !important;
 }
 .bg-white\/95 {
-  background-color: rgba(8, 12, 24, 0.8) !important;
+  background-color: rgba(8, 12, 24, 0.92) !important;
 }
 .bg-white\/90,
 .bg-white\/85,
 .bg-white\/80 {
-  background-color: rgba(10, 15, 28, 0.78) !important;
+  background-color: rgba(10, 15, 28, 0.9) !important;
 }
 .bg-white\/70,
 .bg-white\/60,
 .bg-white\/50 {
-  background-color: rgba(15, 22, 40, 0.6) !important;
+  background-color: rgba(15, 22, 40, 0.8) !important;
 }
 .bg-white\/10 {
   background-color: rgba(255, 255, 255, 0.1) !important;
@@ -87,18 +87,32 @@
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
+/* Nút phụ dùng bg-white: nền đặc + viền rõ để nhìn được điểm bấm */
+button.bg-white,
+a.bg-white,
+[role="button"].bg-white {
+  background-color: rgba(19, 27, 46, 0.95) !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+button.bg-white:hover,
+a.bg-white:hover {
+  background-color: rgba(30, 41, 66, 0.98) !important;
+  border-color: rgba(129, 140, 248, 0.5) !important;
+}
+
 /* Nền slate sáng -> panel tối */
 .bg-slate-50 {
   background-color: #04060d !important;
 }
 .bg-slate-100 {
-  background-color: rgba(255, 255, 255, 0.055) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 .bg-slate-200 {
-  background-color: rgba(255, 255, 255, 0.12) !important;
+  background-color: rgba(255, 255, 255, 0.18) !important;
 }
 .bg-slate-300 {
-  background-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(255, 255, 255, 0.26) !important;
 }
 
 /* Nền tint nhạt -> tint tối */
@@ -189,27 +203,27 @@
   color: #93a3ba !important;
 }
 
-/* Border sáng -> viền tối mờ */
+/* Border sáng -> viền tối mờ (rõ hơn cho nút/card) */
 .border-slate-200 {
-  border-color: rgba(148, 163, 184, 0.16) !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
 }
 .border-slate-200\/70 {
-  border-color: rgba(148, 163, 184, 0.12) !important;
-}
-.border-slate-200\/50 {
-  border-color: rgba(148, 163, 184, 0.09) !important;
-}
-.border-slate-300 {
-  border-color: rgba(148, 163, 184, 0.26) !important;
-}
-.border-slate-100 {
-  border-color: rgba(148, 163, 184, 0.1) !important;
-}
-.border-gray-200 {
   border-color: rgba(148, 163, 184, 0.16) !important;
 }
+.border-slate-200\/50 {
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+.border-slate-300 {
+  border-color: rgba(148, 163, 184, 0.32) !important;
+}
+.border-slate-100 {
+  border-color: rgba(148, 163, 184, 0.14) !important;
+}
+.border-gray-200 {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
 .border-gray-300 {
-  border-color: rgba(148, 163, 184, 0.26) !important;
+  border-color: rgba(148, 163, 184, 0.32) !important;
 }
 .border-amber-200 {
   border-color: rgba(245, 158, 11, 0.3) !important;
