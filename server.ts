@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -2342,6 +2343,9 @@ export async function buildApp(options?: { serveStatic?: boolean; databaseUrl?: 
   app.use(express.json({ limit: "25mb" }));
   app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
+  // Nén gzip tất cả response (JS/CSS/JSON/HTML) để tiết kiệm bandwidth
+  app.use(compression());
+
   // Khởi tạo các bảng PostgreSQL khi app được build (trong handler, không global scope)
   if (pgPool) {
     await initDBTables(pgPool);
@@ -3711,8 +3715,20 @@ Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
       });
       app.use(vite.middlewares);
     } else {
-      app.use(express.static(distPath));
+      // Asset có hash trong tên -> cache 1 năm, immutable (không cần tải lại)
+      app.use(
+        "/assets",
+        express.static(path.join(distPath, "assets"), {
+          maxAge: "365d",
+          immutable: true,
+          setHeaders: (res) => res.setHeader("Cache-Control", "public, max-age=31536000, immutable"),
+        })
+      );
+      // File tĩnh khác (favicon, sw.js, ads.txt...) cache ngắn hạn
+      app.use(express.static(distPath, { maxAge: "1h", index: false }));
+      // SPA fallback: index.html KHÔNG cache (luôn check bản mới, asset thay đổi theo hash)
       app.get("*", (_req, res) => {
+        res.setHeader("Cache-Control", "no-cache, must-revalidate");
         res.sendFile(path.join(distPath, "index.html"));
       });
     }

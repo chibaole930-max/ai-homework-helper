@@ -3,19 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Navbar } from './components/Navbar';
 import { FloatingBackground } from './components/FloatingBackground';
 import { AppDashboard, OpenFeature } from './components/AppDashboard';
-import { LessonNoteTab } from './components/LessonNoteTab';
-import { ExerciseSolverTab } from './components/ExerciseSolverTab';
-import { SavedNotesTab } from './components/SavedNotesTab';
-import { PresetLibraryTab } from './components/PresetLibraryTab';
-import { HocBaTab } from './components/HocBaTab';
-import { LoTrinhTab } from './components/LoTrinhTab';
-import { FlashcardsTab } from './components/FlashcardsTab';
-import { StudyTipsTab } from './components/StudyTipsTab';
-import AdminTab from './components/AdminTab';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { VipModal } from './components/VipModal';
@@ -24,6 +15,33 @@ import { authHeaders } from './lib/auth';
 import { PRESET_LESSON_NOTES } from './data/presets';
 import { SUBJECTS_BY_GRADE, GRADE_LABELS, TEXTBOOKS_BY_GRADE } from './data/grades';
 import { CheckCircle2, Megaphone, Wrench, HeartHandshake, FolderHeart, ArrowLeft, Lock } from 'lucide-react';
+
+// Lazy-load các tab nặng (katex/markdown, chart, admin...) — chỉ tải khi mở tab đó
+const LessonNoteTab = lazy(() =>
+  import('./components/LessonNoteTab').then((m) => ({ default: m.LessonNoteTab }))
+);
+const ExerciseSolverTab = lazy(() =>
+  import('./components/ExerciseSolverTab').then((m) => ({ default: m.ExerciseSolverTab }))
+);
+const PresetLibraryTab = lazy(() =>
+  import('./components/PresetLibraryTab').then((m) => ({ default: m.PresetLibraryTab }))
+);
+const HocBaTab = lazy(() =>
+  import('./components/HocBaTab').then((m) => ({ default: m.HocBaTab }))
+);
+const LoTrinhTab = lazy(() =>
+  import('./components/LoTrinhTab').then((m) => ({ default: m.LoTrinhTab }))
+);
+const FlashcardsTab = lazy(() =>
+  import('./components/FlashcardsTab').then((m) => ({ default: m.FlashcardsTab }))
+);
+const StudyTipsTab = lazy(() =>
+  import('./components/StudyTipsTab').then((m) => ({ default: m.StudyTipsTab }))
+);
+const AdminTab = lazy(() => import('./components/AdminTab'));
+const SavedNotesTab = lazy(() =>
+  import('./components/SavedNotesTab').then((m) => ({ default: m.SavedNotesTab }))
+);
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
@@ -474,14 +492,22 @@ return (
                     Đóng
                   </button>
                 </div>
-                <SavedNotesTab
-                  items={savedItems}
-                  onToggleFavorite={handleToggleFavorite}
-                  onDeleteItem={handleDeleteItem}
-                  onClearAll={handleClearAll}
-                  subjects={subjects}
-                  gradeLabel={gradeLabel}
-                />
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center py-24 text-sm text-slate-400">
+                      Đang tải…
+                    </div>
+                  }
+                >
+                  <SavedNotesTab
+                    items={savedItems}
+                    onToggleFavorite={handleToggleFavorite}
+                    onDeleteItem={handleDeleteItem}
+                    onClearAll={handleClearAll}
+                    subjects={subjects}
+                    gradeLabel={gradeLabel}
+                  />
+                </Suspense>
               </div>
             </div>
           ) : (
@@ -537,7 +563,15 @@ return (
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 lg:px-8">
               <div className="max-w-7xl w-full mx-auto py-3 sm:py-4">
-                {renderFeature(openFeature)}
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center py-24 text-sm text-slate-400">
+                      Đang tải…
+                    </div>
+                  }
+                >
+                  {renderFeature(openFeature)}
+                </Suspense>
               </div>
             </div>
           </div>
