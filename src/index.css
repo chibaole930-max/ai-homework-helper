@@ -243,6 +243,52 @@ a.bg-white:hover {
   border-color: rgba(99, 102, 241, 0.35) !important;
 }
 
+/* Gradient dùng màu sáng gốc (from-slate-50, to-indigo-50/40...) — override riêng,
+   KHÔNG đổi biến màu gốc vì text-slate-50 (chữ sáng) vẫn cần giữ nguyên */
+.from-slate-50 {
+  --tw-gradient-from: #121a2b !important;
+}
+.from-indigo-50 {
+  --tw-gradient-from: #1b2445 !important;
+}
+.to-indigo-50,
+.to-indigo-50\/40 {
+  --tw-gradient-to: rgba(27, 36, 69, 0.45) !important;
+}
+.to-sky-50 {
+  --tw-gradient-to: #0e2434 !important;
+}
+.from-sky-50 {
+  --tw-gradient-from: #0e2434 !important;
+}
+.from-amber-50 {
+  --tw-gradient-from: #241f0e !important;
+}
+.to-amber-50 {
+  --tw-gradient-to: #241f0e !important;
+}
+.via-amber-50 {
+  --tw-gradient-via: #241f0e !important;
+}
+.from-emerald-50 {
+  --tw-gradient-from: #0e261d !important;
+}
+.to-emerald-50 {
+  --tw-gradient-to: #0e261d !important;
+}
+.from-blue-50 {
+  --tw-gradient-from: #13243c !important;
+}
+.to-blue-50 {
+  --tw-gradient-to: #13243c !important;
+}
+.from-rose-50 {
+  --tw-gradient-from: #2b1419 !important;
+}
+.to-rose-50 {
+  --tw-gradient-to: #2b1419 !important;
+}
+
 /* Primary button luôn sáng + hover glow */
 .bg-indigo-600,
 .bg-blue-600 {
