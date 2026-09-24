@@ -3716,9 +3716,39 @@ Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
       app.use(vite.middlewares);
     } else {
       // Asset có hash trong tên -> cache 1 năm, immutable (không cần tải lại)
+      const assetsDir = path.join(distPath, "assets");
+      // Phục vụ file nén sẵn (.br/.gz) — giảm bandwidth tối đa cho free plan Render.
+      // Không nén ở runtime nên không tốn CPU mỗi request.
+      const ASSET_TYPES: Record<string, string> = {
+        ".js": "text/javascript",
+        ".css": "text/css",
+        ".svg": "image/svg+xml",
+        ".json": "application/json",
+        ".wasm": "application/wasm",
+        ".ttf": "font/ttf",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2",
+      };
+      app.get("/assets/*", (req, res, next) => {
+        const rel = decodeURIComponent(req.path).replace(/^\/assets\//, "");
+        const ext = path.extname(rel);
+        const accept = String(req.headers["accept-encoding"] || "");
+        const enc = accept.includes("br") ? "br" : accept.includes("gzip") ? "gzip" : null;
+        if (enc && ASSET_TYPES[ext]) {
+          const pre = path.join(assetsDir, rel + "." + enc);
+          if (fs.existsSync(pre)) {
+            res.setHeader("Content-Encoding", enc);
+            res.setHeader("Content-Type", ASSET_TYPES[ext]);
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+            res.setHeader("Vary", "Accept-Encoding");
+            return res.sendFile(pre);
+          }
+        }
+        next();
+      });
       app.use(
         "/assets",
-        express.static(path.join(distPath, "assets"), {
+        express.static(assetsDir, {
           maxAge: "365d",
           immutable: true,
           setHeaders: (res) => res.setHeader("Cache-Control", "public, max-age=31536000, immutable"),
