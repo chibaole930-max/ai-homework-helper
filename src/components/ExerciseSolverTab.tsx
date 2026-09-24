@@ -288,16 +288,16 @@ export const ExerciseSolverTab: React.FC<ExerciseSolverTabProps> = ({
   return (
     <div className={rootCls}>
       {/* Solver Banner */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-700 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-blue-100 text-xs font-semibold backdrop-blur-xs mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-xs mb-3">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>AI Giải Bài Tập Chuẩn Lời Giải Hay (loigiaihay.com) {gradeLabel}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Giải Chi Tiết Bài Tập Mọi Môn Học
           </h1>
-          <p className="text-blue-100 text-sm sm:text-base leading-relaxed">
+          <p className="text-white/90 text-sm sm:text-base leading-relaxed">
             Nhập đề bài hoặc chụp ảnh bài tập. Hệ thống giải chi tiết theo chuẩn mực sư phạm của
             Lời Giải Hay (loigiaihay.com): Tóm tắt &rarr; Phương pháp giải &rarr; Lời giải chi tiết
             &rarr; Đáp số &rarr; Mẹo tránh bẫy và câu hỏi tự luyện tương tự.

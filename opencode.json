@@ -3,5 +3,24 @@
   "plugin": [
     "opencode-telegram-notifier",
     "@azumag/opencode-rate-limit-fallback"
-  ]
+  ],
+  "default_agent": "build",
+  "model": "ollama/qwen2.5-coder:3b",
+  "agents": {
+    "build": {
+      "mode": "primary",
+      "model": "ollama/qwen2.5-coder:3b"
+    },
+    "general": {
+      "mode": "subagent",
+      "model": "ollama/qwen2.5-coder:3b"
+    },
+    "explore": {
+      "mode": "subagent",
+      "model": "ollama/qwen2.5-coder:3b"
+    }
+  },
+  "compaction": {
+    "auto": false
+  }
 }

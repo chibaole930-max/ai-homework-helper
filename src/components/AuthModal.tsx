@@ -51,7 +51,7 @@ export const AuthModal: React.FC = () => {
         onClick={closeModals}
       />
       <div className="relative animate-announce-in w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-500 px-6 py-5 relative">
+        <div className="bg-gradient-to-tr from-indigo-500 via-violet-500 to-sky-400 px-6 py-5 relative">
           <button
             onClick={closeModals}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors"
@@ -64,7 +64,7 @@ export const AuthModal: React.FC = () => {
           <h2 className="text-xl font-extrabold text-white">
             {mode === 'login' ? 'Đăng nhập tài khoản' : 'Tạo tài khoản học sinh'}
           </h2>
-          <p className="text-sm text-indigo-100 mt-0.5">
+          <p className="text-sm text-white/90 mt-0.5">
             Lưu bài ghi, theo dõi hạn mức AI và kích hoạt gói VIP
           </p>
         </div>

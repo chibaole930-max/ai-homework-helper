@@ -45,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center gap-2 cursor-pointer select-none group flex-shrink-0 min-w-0"
           title="Về bảng điều khiển"
         >
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-indigo-100 group-hover:scale-110 group-active:scale-95 transition-transform duration-200 shrink-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-200/60 group-hover:scale-110 group-active:scale-95 transition-transform duration-200 shrink-0">
             <BookOpenCheck className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-extrabold text-sm sm:text-base text-slate-900 tracking-tight whitespace-nowrap">
                 StudyEZ
               </span>
-              <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1.5 py-0.5 rounded-full uppercase tracking-wider hidden sm:inline-block">
+              <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-full uppercase tracking-wider hidden sm:inline-block">
                 GDPT 2018
               </span>
             </div>
@@ -68,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={goHome}
             title="Về bảng điều khiển"
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 transition-all duration-150 shrink-0"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-100 border border-indigo-200 hover:bg-indigo-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 transition-all duration-150 shrink-0"
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
             <span>Bảng điều khiển</span>
@@ -138,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={openAuth}
-              className="hidden md:block px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 hover:-translate-y-0.5 transition-all duration-150"
+              className="hidden md:block px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-100 border border-indigo-200 hover:bg-indigo-200 hover:-translate-y-0.5 transition-all duration-150"
             >
               Đăng nhập
             </button>

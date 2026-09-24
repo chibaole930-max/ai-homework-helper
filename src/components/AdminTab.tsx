@@ -2216,7 +2216,7 @@ export default function AdminTab() {
                 onClick={() => setVipFilter(f)}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
                   vipFilter === f
-                    ? 'bg-slate-800 text-white'
+                    ? 'bg-indigo-600 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >

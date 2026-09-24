@@ -213,7 +213,7 @@ export const SavedNotesTab: React.FC<SavedNotesTabProps> = ({
             onClick={() => setFilterSubject('all')}
             className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${
               filterSubject === 'all'
-                ? 'bg-slate-800 text-white'
+                ? 'bg-indigo-600 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >

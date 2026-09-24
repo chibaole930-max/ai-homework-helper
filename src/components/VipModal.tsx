@@ -121,7 +121,7 @@ export const VipModal: React.FC = () => {
         onClick={closeModals}
       />
       <div className="relative animate-announce-in w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 px-6 py-5 relative">
+        <div className="bg-gradient-to-tr from-amber-400 via-orange-400 to-rose-400 px-6 py-5 relative">
           <button
             onClick={closeModals}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors"
@@ -132,7 +132,7 @@ export const VipModal: React.FC = () => {
             <Crown className="w-6 h-6 text-yellow-300" />
           </div>
           <h2 className="text-xl font-extrabold text-white">Nâng cấp VIP</h2>
-          <p className="text-sm text-orange-100 mt-0.5">
+          <p className="text-sm text-white/90 mt-0.5">
             AI không giới hạn + truy cập trọn Kho bài mẫu cộng đồng
           </p>
         </div>

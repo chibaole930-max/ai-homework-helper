@@ -57,7 +57,7 @@ export const LoTrinhTab: React.FC<LoTrinhProps> = ({ grade }) => {
           </div>
           <div>
             <h2 className="text-lg font-extrabold">Lộ Trình Cá Nhân Hóa — Lớp {grade}</h2>
-            <p className="text-xs text-amber-100 mt-0.5">
+            <p className="text-xs text-yellow-100 mt-0.5">
               Chia sẻ mục tiêu của bạn, AI sẽ xây dựng lộ trình học phù hợp theo năng lực (chuẩn
               GDPT 2018).
             </p>

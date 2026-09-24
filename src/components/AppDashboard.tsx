@@ -69,7 +69,7 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-extrabold text-white rounded-md px-1.5 py-0.5 bg-slate-900">
+          <span className="text-[10px] font-extrabold text-white rounded-md px-1.5 py-0.5 bg-gradient-to-br from-slate-800 to-slate-900">
             {tile.number}
           </span>
           <h3 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight truncate">
@@ -153,8 +153,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Soạn Bài Ghi',
       subtitle: 'AI soạn bài chuẩn pros',
       icon: Edit3,
-      accentBar: 'bg-gradient-to-r from-indigo-600 to-blue-500',
-      iconBg: 'bg-gradient-to-tr from-indigo-600 to-blue-500',
+      accentBar: 'bg-gradient-to-r from-indigo-400 to-blue-400',
+      iconBg: 'bg-gradient-to-tr from-indigo-500 to-blue-400',
       desc: 'Nhập bài học, chọn môn — nhận ngay bài ghi sạch đẹp, đúng trọng tâm, dễ học.',
       chips: subjects.slice(0, 5).map((s) => s.shortName),
       cta: 'Bắt đầu',
@@ -165,8 +165,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Giải Bài Tập',
       subtitle: 'Giải đề bất kỳ từng bước',
       icon: Sparkles,
-      accentBar: 'bg-gradient-to-r from-amber-500 to-orange-500',
-      iconBg: 'bg-gradient-to-tr from-amber-500 to-orange-500',
+      accentBar: 'bg-gradient-to-r from-amber-400 to-orange-400',
+      iconBg: 'bg-gradient-to-tr from-amber-400 to-orange-400',
       desc: 'Dán đề bài vào, AI giải chi tiết từng bước, dễ hiểu, đúng chương trình.',
       chips: ['Toán', 'Văn', 'Anh', 'Lý', 'Hóa'],
       cta: 'Giải ngay',
@@ -177,8 +177,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Kho Bài Mẫu',
       subtitle: 'Hàng trăm bài mẫu sẵn có',
       icon: Library,
-      accentBar: 'bg-gradient-to-r from-violet-600 to-fuchsia-500',
-      iconBg: 'bg-gradient-to-tr from-violet-600 to-fuchsia-500',
+      accentBar: 'bg-gradient-to-r from-violet-400 to-fuchsia-400',
+      iconBg: 'bg-gradient-to-tr from-violet-500 to-fuchsia-400',
       desc: 'Khám phá bài mẫu chất lượng theo từng môn & bài học, tải về Vở Ghi một chạm.',
       chips: ['Đủ môn', 'Chọn lọc', 'Miễn phí'],
       cta: 'Khám phá',
@@ -189,8 +189,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Vở Ghi',
       subtitle: 'Tài liệu học của riêng bạn',
       icon: FolderHeart,
-      accentBar: 'bg-gradient-to-r from-emerald-500 to-teal-500',
-      iconBg: 'bg-gradient-to-tr from-emerald-500 to-teal-500',
+      accentBar: 'bg-gradient-to-r from-emerald-400 to-teal-400',
+      iconBg: 'bg-gradient-to-tr from-emerald-400 to-teal-400',
       desc:
         savedItems.length > 0
           ? `Bạn đang có ${savedItems.length} bài — mở ra học tiếp ngay nhé.`
@@ -207,8 +207,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Sổ Học Bạ',
       subtitle: 'Đặt chỉ tiêu điểm TBM',
       icon: ClipboardList,
-      accentBar: 'bg-gradient-to-r from-blue-500 to-sky-500',
-      iconBg: 'bg-gradient-to-tr from-blue-500 to-sky-500',
+      accentBar: 'bg-gradient-to-r from-sky-400 to-cyan-400',
+      iconBg: 'bg-gradient-to-tr from-sky-400 to-cyan-400',
       desc: 'Nhập điểm TBM mong muốn theo từng môn, theo dõi tiến độ đạt được cả năm.',
       chips: ['Điểm TBM', 'Mục tiêu', 'Theo dõi'],
       cta: 'Mở sổ',
@@ -219,8 +219,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Lộ Trình Học Tập',
       subtitle: 'Lộ trình cá nhân hóa',
       icon: Route,
-      accentBar: 'bg-gradient-to-r from-orange-500 to-amber-500',
-      iconBg: 'bg-gradient-to-tr from-orange-500 to-amber-500',
+      accentBar: 'bg-gradient-to-r from-orange-400 to-amber-400',
+      iconBg: 'bg-gradient-to-tr from-orange-400 to-amber-400',
       desc: 'Khai mục tiêu của bạn, AI xây lộ trình học từng môn, từng giai đoạn phù hợp.',
       chips: ['Mục tiêu', 'Cá nhân hóa', 'AI'],
       cta: 'Tạo lộ trình',
@@ -231,8 +231,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Thẻ Học Thông Minh',
       subtitle: 'Flashcards + lặp lại ngắt quãng',
       icon: BrainCircuit,
-      accentBar: 'bg-gradient-to-r from-violet-600 to-purple-500',
-      iconBg: 'bg-gradient-to-tr from-violet-600 to-purple-500',
+      accentBar: 'bg-gradient-to-r from-violet-400 to-purple-400',
+      iconBg: 'bg-gradient-to-tr from-violet-500 to-purple-400',
       desc: 'Tạo thẻ từ bài ghi Tiếng Anh, luyện lật thẻ và ôn lại đúng lịch 1-3-7-14-30 ngày để nhớ lâu.',
       chips: ['Từ vựng', 'Lật thẻ', 'Nhớ lâu'],
       cta: 'Học ngay',
@@ -243,8 +243,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       title: 'Mẹo Học Tập',
       subtitle: 'Phương pháp học hiệu quả',
       icon: Lightbulb,
-      accentBar: 'bg-gradient-to-r from-teal-500 to-emerald-500',
-      iconBg: 'bg-gradient-to-tr from-teal-500 to-emerald-500',
+      accentBar: 'bg-gradient-to-r from-teal-400 to-emerald-400',
+      iconBg: 'bg-gradient-to-tr from-teal-400 to-emerald-400',
       desc: 'Cornell 5R, ghi nhớ ngắt quãng, sơ đồ tư duy, cung điện trí nhớ — bí kíp học siêu tốc.',
       chips: ['Cornell', 'Mindmap', 'Active recall'],
       cta: 'Xem mẹo',
@@ -258,25 +258,25 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
         initial={{ opacity: 0, y: -14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="shrink-0 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white p-3 sm:p-4 shadow-md flex items-center gap-3 sm:gap-5"
+        className="shrink-0 relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-400 text-white p-3 sm:p-4 shadow-md shadow-brand-500/25 flex items-center gap-3 sm:gap-5"
       >
-        <div className="absolute -right-10 -top-14 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute right-24 -bottom-16 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -right-10 -top-14 w-48 h-48 bg-white/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute right-24 -bottom-16 w-40 h-40 bg-white/20 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 flex-1 min-w-0">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-blue-100 text-[11px] font-semibold mb-1.5 backdrop-blur-sm">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-[11px] font-semibold mb-1.5 backdrop-blur-sm">
             <GraduationCap className="w-3.5 h-3.5" />
             {isTHCS ? 'Khối THCS' : 'Khối THPT'} • Hỗ trợ học tập lớp {grade}
           </span>
           <h1 className="text-base sm:text-xl font-extrabold tracking-tight leading-tight">
             Học giỏi – nhẹ nhàng hơn mỗi ngày
           </h1>
-          <p className="hidden sm:block text-xs text-blue-100 mt-0.5">
+          <p className="hidden sm:block text-xs text-white/90 mt-0.5">
             Soạn bài, giải bài, kho bài mẫu, sổ học bạ và lộ trình — gọn trong một màn hình.
           </p>
         </div>
         <button
           onClick={() => onOpenFeature('notes')}
-          className="relative z-10 shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-white text-blue-700 hover:bg-blue-50 active:scale-[0.98] transition-all text-xs sm:text-sm font-extrabold shadow-lg shadow-blue-900/20"
+          className="relative z-10 shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-white text-indigo-600 hover:bg-indigo-50 active:scale-[0.98] transition-all text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-900/10"
         >
           <Sparkles className="w-4 h-4 text-amber-500" />
           Soạn bài ngay
@@ -294,7 +294,7 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
             }}
             className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 ${
               isTHCS
-                ? 'bg-gradient-to-tr from-blue-600 to-sky-500 text-white shadow-sm'
+                ? 'bg-gradient-to-tr from-blue-500 to-sky-400 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white'
             }`}
           >
@@ -308,7 +308,7 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
             }}
             className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 ${
               !isTHCS
-                ? 'bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-sm'
+                ? 'bg-gradient-to-tr from-orange-400 to-amber-400 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white'
             }`}
           >
@@ -335,8 +335,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
                   className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all duration-150 border hover:-translate-y-0.5 ${
                     grade === g
                       ? isTHCS
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                        ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                        : 'bg-orange-400 text-white border-orange-400 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                   }`}
                 >

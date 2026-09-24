@@ -362,7 +362,7 @@ const handleSaveItem = async (itemData: Omit<SavedStudyItem, 'id' | 'date'>) => 
 
 if (isAdmin) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 relative">
+      <div className="min-h-screen flex flex-col bg-transparent text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-900 relative">
         <FloatingBackground />
         <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
           <AdminTab />
@@ -445,7 +445,7 @@ case 'saved':
   if (siteStatus?.maintenance.enabled) {
     const featureBlocked = openFeature !== null && openFeature !== 'saved';
 return (
-      <div className="h-dvh flex flex-col bg-slate-50 text-slate-100 font-sans overflow-hidden relative z-10">
+      <div className="h-dvh flex flex-col bg-transparent text-slate-800 font-sans overflow-hidden relative z-10">
         <FloatingBackground />
         <Navbar
           grade={grade}
@@ -527,7 +527,7 @@ return (
   }
 
 return (
-    <div className="h-dvh flex flex-col bg-slate-50 text-slate-100 font-sans overflow-hidden selection:bg-indigo-300/30 selection:text-white relative z-10">
+    <div className="h-dvh flex flex-col bg-transparent text-slate-800 font-sans overflow-hidden selection:bg-indigo-200/60 selection:text-indigo-950 relative z-10">
       <FloatingBackground />
       <Navbar
         grade={grade}
@@ -585,7 +585,7 @@ return (
             onClick={dismissAnnouncement}
           />
           <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-announce-in">
-            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 px-5 pt-5 pb-14 relative">
+            <div className="bg-gradient-to-br from-brand-500 via-violet-500 to-sky-400 px-5 pt-5 pb-14 relative">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 text-white ring-1 ring-white/30">
                 <Megaphone className="w-6 h-6" />
               </div>
@@ -656,7 +656,7 @@ return (
       <VipModal />
 
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-medium animate-bounce-short">
+        <div className="fixed bottom-5 right-5 z-50 bg-white text-slate-800 px-4 py-3 rounded-2xl shadow-xl border border-slate-200 flex items-center gap-2.5 text-xs sm:text-sm font-medium animate-bounce-short">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           <span>{toastMessage}</span>
         </div>

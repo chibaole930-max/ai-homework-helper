@@ -327,16 +327,16 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   return (
     <div className={rootCls}>
       {/* Introduction Banner */}
-      <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-indigo-100 text-xs font-semibold backdrop-blur-xs mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-xs mb-3">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>Trợ Lý Soạn Bài AI Chuyên Sâu {gradeLabel}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Soạn Bài Ghi & Tổng Hợp Kiến Thức Trọng Tâm
           </h1>
-          <p className="text-indigo-100 text-sm sm:text-base leading-relaxed">
+          <p className="text-white/90 text-sm sm:text-base leading-relaxed">
             Chuẩn hóa bài ghi vở cho tất cả 11 môn học {gradeLabel} theo chương trình GDPT 2018 mới nhất.
             Hỗ trợ vẽ sơ đồ tư duy, tóm lược công thức cốt lõi và câu hỏi ôn thi THPT Quốc gia.
           </p>

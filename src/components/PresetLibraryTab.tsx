@@ -207,16 +207,16 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Banner */}
-      <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-800 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-emerald-100 text-xs font-semibold backdrop-blur-xs mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-xs mb-3">
             <Library className="w-3.5 h-3.5 text-amber-300" />
             <span>Kho Học Liệu Mẫu Chuẩn GDPT 2018 - Đồng bộ cộng đồng</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Thư Viện Bài Soạn & Lời Giải Mẫu cho Lớp 10, 11, 12
           </h1>
-          <p className="text-emerald-100 text-sm sm:text-base leading-relaxed">
+          <p className="text-white/90 text-sm sm:text-base leading-relaxed">
             Kho bài mẫu dùng chung cho tất cả mọi người sử dụng web, phân chia theo khối lớp!
             Bạn có thể lọc lớp 10 / 11 / 12, đọc ngay, lưu vào Vở ghi, bày tỏ thích, và <span className="font-semibold text-white">đóng góp bài mẫu của riêng mình</span> để đồng bộ cho cộng đồng.
           </p>
@@ -226,7 +226,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
               <b className="text-white">{items.length}</b> bài mẫu đang chia sẻ
             </span>
             {syncedAt && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/15 text-emerald-200">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-white">
                 <Sparkles className="w-3.5 h-3.5" />
                 Đồng bộ lúc {new Date(syncedAt).toLocaleTimeString('vi-VN', {
                   hour: '2-digit',

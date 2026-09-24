@@ -77,7 +77,7 @@ export function FloatingBackground() {
         className="absolute inset-x-0 top-0 h-56"
         style={{
           background:
-            'linear-gradient(180deg, rgba(129,140,248,0.14), rgba(6,10,20,0) 100%)',
+            'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0) 100%)',
         }}
       />
 

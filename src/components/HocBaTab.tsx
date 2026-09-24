@@ -113,14 +113,14 @@ export const HocBaTab: React.FC<HocBaProps> = ({ subjects, grade }) => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white rounded-2xl p-4 shadow-md">
+      <div className="bg-gradient-to-r from-blue-500 via-indigo-400 to-sky-400 text-white rounded-2xl p-4 shadow-md">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
             <ClipboardList className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-lg font-extrabold">Sổ Học Bạ Điện Tử — Lớp {grade}</h2>
-            <p className="text-xs text-blue-100 mt-0.5">
+            <p className="text-xs text-white/90 mt-0.5">
               Nhập điểm TBM (trung bình môn) bạn muốn đạt được cho từng môn, lưu lại để theo dõi
               mục tiêu cả năm.
             </p>

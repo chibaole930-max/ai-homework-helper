@@ -1,41 +1,62 @@
 @import "tailwindcss";
 
 /* =====================================================================
-   STUDYEZ — PREMIUM DARK / FUTURISTIC THEME
-   Chiến lược: override trực tiếp các utility sáng của Tailwind thành
-   tông dark/glass — KHÔNG sửa từng component.
+   STUDYEZ — PASTEL LIGHT DESIGN SYSTEM
    ===================================================================== */
+
+@theme {
+  --font-sans: "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Pastel brand (indigo/violet) */
+  --color-brand-50: #eef1fd;
+  --color-brand-100: #e1e6fb;
+  --color-brand-200: #c6cdf7;
+  --color-brand-300: #9ea9f1;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+
+  /* Neutral pastel surfaces */
+  --color-paper: #f6f7fc;
+  --color-ink: #2b3352;
+  --color-muted: #6b7496;
+  --color-softline: #e6e9f4;
+}
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --font-display: "Space Grotesk", "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, sans-serif;
-    --font-body: "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, sans-serif;
+    color-scheme: light;
   }
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    background-color: #04060d;
+    background-color: #f6f7fc;
     background-image:
-      radial-gradient(1100px 500px at 50% -10%, rgba(79, 70, 229, 0.16), transparent 60%),
-      radial-gradient(900px 600px at 90% 20%, rgba(8, 145, 178, 0.1), transparent 55%),
-      radial-gradient(800px 700px at 5% 40%, rgba(139, 92, 246, 0.09), transparent 55%);
+      radial-gradient(1100px 560px at 12% -8%, rgba(129, 140, 248, 0.16), transparent 60%),
+      radial-gradient(1000px 620px at 88% 4%, rgba(56, 189, 248, 0.12), transparent 58%),
+      radial-gradient(900px 700px at 96% 88%, rgba(192, 132, 252, 0.1), transparent 55%),
+      radial-gradient(800px 700px at 4% 92%, rgba(52, 211, 153, 0.1), transparent 55%);
     background-attachment: fixed;
-    color: #e8edf6;
-    font-family: var(--font-body);
+    color: #2b3352;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    min-height: 100vh;
   }
 
   ::selection {
-    background: rgba(99, 102, 241, 0.35);
-    color: #fff;
+    background: rgba(129, 140, 248, 0.28);
+    color: #1e1b4b;
   }
 
-  /* Thanh cuộn futuristic */
+  /* Thanh cuộn pastel light */
   *::-webkit-scrollbar {
     width: 9px;
     height: 9px;
@@ -44,300 +65,135 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(8, 145, 178, 0.5));
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.35), rgba(56, 189, 248, 0.35));
     border-radius: 99px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(129, 140, 248, 0.8), rgba(34, 211, 238, 0.8));
+    background: linear-gradient(180deg, rgba(79, 70, 229, 0.55), rgba(14, 165, 233, 0.55));
     background-clip: padding-box;
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(99, 102, 241, 0.5) transparent;
+    scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
   }
 }
 
 /* =====================================================================
-   INVERT MÀU SÁNG -> DARK (áp toàn cục, không sửa JSX)
+   COMPONENT PRIMITIVES (dùng chung, giúp UI nhất quán)
    ===================================================================== */
+@layer components {
+  .card {
+    background-color: #fff;
+    border: 1px solid var(--color-softline);
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(43, 51, 82, 0.04), 0 8px 24px -16px rgba(43, 51, 82, 0.12);
+  }
 
-/* Nền trắng -> bề mặt tối bán đặc (đọc rõ, vẫn giữ chút glass) */
-.bg-white {
-  background-color: rgba(15, 22, 38, 0.9) !important;
-}
-.bg-white\/95 {
-  background-color: rgba(8, 12, 24, 0.92) !important;
-}
-.bg-white\/90,
-.bg-white\/85,
-.bg-white\/80 {
-  background-color: rgba(10, 15, 28, 0.9) !important;
-}
-.bg-white\/70,
-.bg-white\/60,
-.bg-white\/50 {
-  background-color: rgba(15, 22, 40, 0.8) !important;
-}
-.bg-white\/10 {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-.bg-white\/5 {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-}
+  .card-hover {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  @media (hover: hover) {
+    .card-hover:hover {
+      transform: translateY(-3px);
+      border-color: rgba(129, 140, 248, 0.45);
+      box-shadow: 0 18px 40px -20px rgba(99, 102, 241, 0.35);
+    }
+  }
+  .card-hover:active {
+    transform: translateY(-1px) scale(0.995);
+  }
 
-/* Nút phụ dùng bg-white: nền đặc + viền rõ để nhìn được điểm bấm */
-button.bg-white,
-a.bg-white,
-[role="button"].bg-white {
-  background-color: rgba(19, 27, 46, 0.95) !important;
-  border-color: rgba(148, 163, 184, 0.35) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-button.bg-white:hover,
-a.bg-white:hover {
-  background-color: rgba(30, 41, 66, 0.98) !important;
-  border-color: rgba(129, 140, 248, 0.5) !important;
-}
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    border-radius: 0.75rem;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease,
+      border-color 0.2s ease, opacity 0.2s ease;
+    cursor: pointer;
+  }
+  .btn:active {
+    transform: scale(0.97);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
-/* Nền slate sáng -> panel tối */
-.bg-slate-50 {
-  background-color: #04060d !important;
-}
-.bg-slate-100 {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-.bg-slate-200 {
-  background-color: rgba(255, 255, 255, 0.18) !important;
-}
-.bg-slate-300 {
-  background-color: rgba(255, 255, 255, 0.26) !important;
-}
+  .btn-primary {
+    background-image: linear-gradient(135deg, #6366f1, #7c7ff5 55%, #38bdf8);
+    color: #fff;
+    box-shadow: 0 10px 24px -12px rgba(79, 70, 229, 0.6);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 14px 30px -12px rgba(79, 70, 229, 0.75);
+    filter: brightness(1.04);
+  }
 
-/* Nền tint nhạt -> tint tối */
-.bg-indigo-50 {
-  background-color: rgba(99, 102, 241, 0.14) !important;
-}
-.bg-indigo-100 {
-  background-color: rgba(99, 102, 241, 0.22) !important;
-}
-.bg-amber-50 {
-  background-color: rgba(245, 158, 11, 0.1) !important;
-}
-.bg-amber-100 {
-  background-color: rgba(245, 158, 11, 0.18) !important;
-}
-.bg-emerald-50 {
-  background-color: rgba(16, 185, 129, 0.1) !important;
-}
-.bg-emerald-100 {
-  background-color: rgba(16, 185, 129, 0.18) !important;
-}
-.bg-rose-50 {
-  background-color: rgba(244, 63, 94, 0.1) !important;
-}
-.bg-rose-100 {
-  background-color: rgba(244, 63, 94, 0.18) !important;
-}
-.bg-sky-50 {
-  background-color: rgba(14, 165, 233, 0.1) !important;
-}
-.bg-violet-50 {
-  background-color: rgba(139, 92, 246, 0.1) !important;
-}
-.bg-green-50 {
-  background-color: rgba(34, 197, 94, 0.1) !important;
-}
-.bg-red-50 {
-  background-color: rgba(239, 68, 68, 0.1) !important;
-}
-.bg-zinc-50 {
-  background-color: rgba(255, 255, 255, 0.04) !important;
-}
+  .btn-soft {
+    background-color: var(--color-brand-100);
+    color: #4338ca;
+    border: 1px solid #d8ddf8;
+  }
+  .btn-soft:hover {
+    background-color: #d6dcfa;
+    border-color: #b9c2f5;
+  }
 
-/* Text tối -> sáng */
-.text-slate-900 {
-  color: #eef2fa !important;
-}
-.text-slate-800 {
-  color: #d7deea !important;
-}
-.text-slate-700 {
-  color: #b6c2d4 !important;
-}
-.text-slate-600 {
-  color: #93a3ba !important;
-}
-.text-slate-500 {
-  color: #7b8aa0 !important;
-}
-.text-slate-400 {
-  color: #64748b !important;
-}
-.text-slate-300 {
-  color: #cbd5e1 !important;
-}
-.text-gray-900 {
-  color: #eef2fa !important;
-}
-.text-gray-800 {
-  color: #d7deea !important;
-}
-.text-gray-700 {
-  color: #b6c2d4 !important;
-}
-.text-gray-600 {
-  color: #93a3ba !important;
-}
-.text-gray-500 {
-  color: #7b8aa0 !important;
-}
-.text-zinc-900,
-.text-zinc-800,
-.text-zinc-700 {
-  color: #eef2fa !important;
-}
-.text-zinc-600,
-.text-zinc-500 {
-  color: #93a3ba !important;
-}
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--color-muted);
+    border: 1px solid var(--color-softline);
+  }
+  .btn-ghost:hover {
+    background-color: #eef0f8;
+    color: var(--color-ink);
+  }
 
-/* Border sáng -> viền tối mờ (rõ hơn cho nút/card) */
-.border-slate-200 {
-  border-color: rgba(148, 163, 184, 0.22) !important;
-}
-.border-slate-200\/70 {
-  border-color: rgba(148, 163, 184, 0.16) !important;
-}
-.border-slate-200\/50 {
-  border-color: rgba(148, 163, 184, 0.12) !important;
-}
-.border-slate-300 {
-  border-color: rgba(148, 163, 184, 0.32) !important;
-}
-.border-slate-100 {
-  border-color: rgba(148, 163, 184, 0.14) !important;
-}
-.border-gray-200 {
-  border-color: rgba(148, 163, 184, 0.22) !important;
-}
-.border-gray-300 {
-  border-color: rgba(148, 163, 184, 0.32) !important;
-}
-.border-amber-200 {
-  border-color: rgba(245, 158, 11, 0.3) !important;
-}
-.border-amber-300 {
-  border-color: rgba(245, 158, 11, 0.42) !important;
-}
-.border-emerald-200,
-.border-green-200 {
-  border-color: rgba(16, 185, 129, 0.3) !important;
-}
-.border-rose-200,
-.border-red-200 {
-  border-color: rgba(244, 63, 94, 0.3) !important;
-}
-.border-indigo-200 {
-  border-color: rgba(99, 102, 241, 0.35) !important;
-}
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
 
-/* Gradient dùng màu sáng gốc (from-slate-50, to-indigo-50/40...) — override riêng,
-   KHÔNG đổi biến màu gốc vì text-slate-50 (chữ sáng) vẫn cần giữ nguyên */
-.from-slate-50 {
-  --tw-gradient-from: #121a2b !important;
-}
-.from-indigo-50 {
-  --tw-gradient-from: #1b2445 !important;
-}
-.to-indigo-50,
-.to-indigo-50\/40 {
-  --tw-gradient-to: rgba(27, 36, 69, 0.45) !important;
-}
-.to-sky-50 {
-  --tw-gradient-to: #0e2434 !important;
-}
-.from-sky-50 {
-  --tw-gradient-from: #0e2434 !important;
-}
-.from-amber-50 {
-  --tw-gradient-from: #241f0e !important;
-}
-.to-amber-50 {
-  --tw-gradient-to: #241f0e !important;
-}
-.via-amber-50 {
-  --tw-gradient-via: #241f0e !important;
-}
-.from-emerald-50 {
-  --tw-gradient-from: #0e261d !important;
-}
-.to-emerald-50 {
-  --tw-gradient-to: #0e261d !important;
-}
-.from-blue-50 {
-  --tw-gradient-from: #13243c !important;
-}
-.to-blue-50 {
-  --tw-gradient-to: #13243c !important;
-}
-.from-rose-50 {
-  --tw-gradient-from: #2b1419 !important;
-}
-.to-rose-50 {
-  --tw-gradient-to: #2b1419 !important;
-}
+  .input {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-softline);
+    background-color: #fff;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .input::placeholder {
+    color: #9aa3c2;
+  }
+  .input:focus {
+    border-color: rgba(99, 102, 241, 0.6);
+    box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.16);
+  }
 
-/* Primary button luôn sáng + hover glow */
-.bg-indigo-600,
-.bg-blue-600 {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0)) !important;
-}
-.bg-indigo-600:hover,
-.bg-blue-600:hover {
-  box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.7);
-}
-
-.text-indigo-700,
-.text-indigo-600 {
-  color: #818cf8 !important;
-}
-.text-amber-600,
-.text-amber-700 {
-  color: #fbbf24 !important;
-}
-.text-emerald-600,
-.text-green-600 {
-  color: #34d399 !important;
-}
-.text-rose-600,
-.text-red-600 {
-  color: #fb7185 !important;
-}
-.text-sky-600 {
-  color: #38bdf8 !important;
-}
-.text-violet-600 {
-  color: #a78bfa !important;
-}
-.text-blue-600 {
-  color: #60a5fa !important;
-}
-
-.shadow-indigo-100,
-.shadow-indigo-200,
-.shadow-blue-100,
-.shadow-slate-200,
-.shadow-gray-200 {
-  box-shadow: 0 8px 24px -12px rgba(79, 70, 229, 0.35) !important;
-}
-.shadow-indigo-500\/20 {
-  box-shadow: 0 12px 32px -12px rgba(99, 102, 241, 0.5) !important;
+  .glass-panel {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+  }
 }
 
 /* =====================================================================
-   TYPOGRAPHY HIỆN ĐẠI
+   TYPOGRAPHY & GRADIENTS
    ===================================================================== */
 .font-display {
   font-family: var(--font-display);
@@ -348,9 +204,15 @@ a.bg-white:hover {
   letter-spacing: -0.015em;
 }
 
-/* Gradient chữ chủ đạo (dark-tuned) */
 .text-gradient-brand {
-  background: linear-gradient(90deg, #818cf8, #22d3ee 45%, #a78bfa 90%);
+  background: linear-gradient(92deg, #4f46e5, #0ea5e9 45%, #9333ea 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-pastel {
+  background: linear-gradient(92deg, #6366f1, #38bdf8 55%, #a78bfa);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -360,40 +222,62 @@ a.bg-white:hover {
    MICRO-INTERACTIONS
    ===================================================================== */
 @media (hover: hover) {
-  /* Card nào cũng có phản hồi nhẹ */
-  main [class*="rounded-2xl"] {
-    transition:
-      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-      box-shadow 0.25s ease,
-      border-color 0.25s ease;
-  }
-  main [class*="rounded-2xl"].bg-white:hover {
-    transform: translateY(-2px);
-    border-color: rgba(129, 140, 248, 0.4);
-    box-shadow: 0 16px 44px -16px rgba(79, 70, 229, 0.45);
-  }
-  main button {
+  main button:not(.btn) {
     transition:
       transform 0.15s ease,
       box-shadow 0.2s ease,
       background-color 0.2s ease,
-      border-color 0.2s ease;
+      border-color 0.2s ease,
+      opacity 0.2s ease;
   }
-  main button:hover {
-    box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.6);
-  }
-  main button:active {
+  main button:not(.btn):active {
     transform: scale(0.97);
   }
 }
 
 /* =====================================================================
-   BACKGROUND FX LỚP (FloatingBackground render DOM, CSS này tạo hiệu ứng)
+   ANIMATION UTILITIES (định nghĩa cho các class đang dùng trong app)
+   ===================================================================== */
+@keyframes announce-backdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-announce-backdrop {
+  animation: announce-backdrop 0.25s ease-out forwards;
+}
+
+@keyframes announce-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.animate-announce-in {
+  animation: announce-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.22s ease-out forwards;
+}
+
+@keyframes bounce-short {
+  0% { opacity: 0; transform: translateY(14px) scale(0.97); }
+  55% { transform: translateY(-3px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-bounce-short {
+  animation: bounce-short 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* =====================================================================
+   BACKGROUND FX — PASTEL LIGHT (FloatingBackground)
    ===================================================================== */
 .bgfx-grid {
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(43, 51, 82, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 51, 82, 0.05) 1px, transparent 1px);
   background-size: 56px 56px;
   -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
   mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
@@ -404,77 +288,112 @@ a.bg-white:hover {
   will-change: transform;
 }
 .bgfx-orb-a {
-  background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.5), transparent 65%);
+  background: radial-gradient(circle at 30% 30%, rgba(129, 140, 248, 0.4), transparent 65%);
   animation: orb-drift-a 26s ease-in-out infinite alternate;
 }
 .bgfx-orb-b {
-  background: radial-gradient(circle at 60% 40%, rgba(8, 145, 178, 0.42), transparent 65%);
+  background: radial-gradient(circle at 60% 40%, rgba(56, 189, 248, 0.34), transparent 65%);
   animation: orb-drift-b 32s ease-in-out infinite alternate;
 }
 .bgfx-orb-c {
-  background: radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.36), transparent 65%);
+  background: radial-gradient(circle at 40% 60%, rgba(192, 132, 252, 0.32), transparent 65%);
   animation: orb-drift-c 38s ease-in-out infinite alternate;
 }
 
 @keyframes orb-drift-a {
   from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(6%, 8%, 0) scale(1.12); }
+  to { transform: translate3d(6%, 8%, 0) scale(1.12); }
 }
 @keyframes orb-drift-b {
   from { transform: translate3d(0, 0, 0) scale(1.1); }
-  to   { transform: translate3d(-7%, -6%, 0) scale(0.96); }
+  to { transform: translate3d(-7%, -6%, 0) scale(0.96); }
 }
 @keyframes orb-drift-c {
   from { transform: translate3d(0, 0, 0) scale(0.95); }
-  to   { transform: translate3d(5%, -7%, 0) scale(1.15); }
+  to { transform: translate3d(5%, -7%, 0) scale(1.15); }
 }
 
 .bgfx-particle {
   position: absolute;
   border-radius: 9999px;
-  background: radial-gradient(circle at 35% 35%, #fff, rgba(148, 163, 184, 0.4));
-  box-shadow: 0 0 8px 1px rgba(148, 163, 184, 0.35);
+  background: radial-gradient(circle at 35% 35%, #6366f1, rgba(56, 189, 248, 0.55));
+  box-shadow: 0 0 8px 1px rgba(99, 102, 241, 0.3);
   pointer-events: none;
   animation: particle-float linear infinite;
 }
 @keyframes particle-float {
-  0%   { transform: translateY(0) translateX(0); opacity: var(--p-op, 0.5); }
-  50%  { transform: translateY(-26px) translateX(8px); opacity: calc(var(--p-op, 0.5) * 0.6); }
+  0% { transform: translateY(0) translateX(0); opacity: var(--p-op, 0.5); }
+  50% { transform: translateY(-26px) translateX(8px); opacity: calc(var(--p-op, 0.5) * 0.55); }
   100% { transform: translateY(0) translateX(0); opacity: var(--p-op, 0.5); }
 }
 
-/* Skeleton shimmer dark-tuned */
+/* Skeleton shimmer light */
 .skeleton-shimmer {
   background: linear-gradient(
     90deg,
-    rgba(148, 163, 184, 0.09) 25%,
-    rgba(148, 163, 184, 0.24) 50%,
-    rgba(148, 163, 184, 0.09) 75%
+    rgba(43, 51, 82, 0.05) 25%,
+    rgba(43, 51, 82, 0.12) 50%,
+    rgba(43, 51, 82, 0.05) 75%
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
 
-/* Đệm an toàn dưới cùng để nút sticky không che nội dung trên mobile */
+/* Đệm an toàn dưới cùng cho mobile */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Ẩn thanh cuộn ngang nhẹ nhàng (tablets/nhỏ) */
 .scroll-snap-x {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Tôn trọng người dùng giảm chuyển động */
+/* =====================================================================
+   INTRO SPLASH FX
+   ===================================================================== */
+@keyframes intro-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(6deg); }
+}
+.intro-float {
+  animation: intro-float 3.2s ease-in-out infinite;
+}
+
+@keyframes intro-ring {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+.intro-ring {
+  animation: intro-ring 1.8s ease-out infinite;
+}
+
+@keyframes intro-bar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* =====================================================================
+   TÔN TRỌNG GIẢM CHUYỂN ĐỘNG
+   ===================================================================== */
 @media (prefers-reduced-motion: reduce) {
   .bgfx-orb-a,
   .bgfx-orb-b,
   .bgfx-orb-c,
-  .bgfx-particle {
+  .bgfx-particle,
+  .intro-float,
+  .intro-ring {
     animation: none !important;
   }
   html {
     scroll-behavior: auto;
+  }
+  .card-hover,
+  main button {
+    transition: none !important;
   }
 }

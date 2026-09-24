@@ -288,16 +288,16 @@ function TipRow({ tip, defaultOpen }: { tip: Tip; defaultOpen?: boolean }) {
 export const StudyTipsTab: React.FC = () => {
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-teal-500 via-emerald-500 to-green-500 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-teal-100 text-xs font-semibold backdrop-blur-xs mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-xs mb-3">
             <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
             <span>Bộ Sưu Tập Bí Kíp Học Tập Cho Học Sinh Việt Nam</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Mẹo Học Tập Siêu Đỉnh
           </h1>
-          <p className="text-teal-50 text-sm sm:text-base leading-relaxed">
+          <p className="text-white/90 text-sm sm:text-base leading-relaxed">
             8 phương pháp học hàng đầu thế giới — từ Cornell 5R, ghi nhớ ngắt quãng đến cung điện trí
             nhớ — được dịch thành mẹo thực dụng cho chương trình học Việt Nam.
           </p>

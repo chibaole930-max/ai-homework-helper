@@ -328,16 +328,16 @@ export const FlashcardsTab: React.FC<FlashcardsTabProps> = ({ savedItems }) => {
 
   return (
     <div className="space-y-6 relative">
-      <div className="bg-gradient-to-r from-indigo-700 via-violet-600 to-purple-600 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-indigo-100 text-xs font-semibold backdrop-blur-xs mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-xs mb-3">
             <BrainCircuit className="w-3.5 h-3.5 text-amber-300" />
             <span>Ôn Tập Thông Minh • Lặp Lại Ngắt Quãng (Spaced Repetition)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Thẻ Học Thông Minh (Flashcards)
           </h1>
-          <p className="text-indigo-100 text-sm sm:text-base leading-relaxed">
+          <p className="text-white/90 text-sm sm:text-base leading-relaxed">
             Học từ vựng & câu hỏi dạng thẻ lật: ôn lại sau 1 — 3 — 7 — 14 — 30 ngày theo lịch trình
             khoa học, lâu quên hơn, chuẩn phương pháp của các app học hàng đầu thế giới.
           </p>
