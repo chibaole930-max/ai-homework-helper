@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PRESET_LESSON_NOTES } from '../data/presets';
 import { SavedStudyItem, SubjectId, SubjectInfo, GradeId } from '../types';
-import { MarkdownRenderer } from './MarkdownRenderer';
 import { authHeaders } from '../lib/auth';
-import { useAuth } from '../context/AuthContext';
 import {
   Library,
   BookOpen,
@@ -11,17 +9,14 @@ import {
   Search,
   BookmarkPlus,
   Check,
-  ChevronRight,
   Eye,
   X,
-  FileCheck2,
   PlusCircle,
   ThumbsUp,
   Users,
   Send,
   Loader2,
   Star,
-  MessageCircle,
 } from 'lucide-react';
 
 interface CommunityPreset extends SavedStudyItem {
@@ -32,23 +27,6 @@ interface CommunityPreset extends SavedStudyItem {
   avgRating?: number;
   ratingCount?: number;
 }
-
-interface PresetCommentView {
-  id: string;
-  author: string;
-  content: string;
-  createdAt: string;
-}
-
-interface Discussions {
-  comments: PresetCommentView[];
-  rating: { avg: number; count: number; mine: number | null };
-}
-
-const EMPTY_DISCUSSIONS: Discussions = {
-  comments: [],
-  rating: { avg: 0, count: 0, mine: null },
-};
 
 interface PresetLibraryTabProps {
   onImportPreset: (item: SavedStudyItem) => void;
@@ -63,16 +41,13 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
   subjects,
   grade,
 }) => {
-  const { user } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
-  const [activeItem, setActiveItem] = useState<CommunityPreset | null>(null);
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<CommunityPreset[]>(PRESET_LESSON_NOTES as CommunityPreset[]);
   const [loading, setLoading] = useState(true);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [contributing, setContributing] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [showContribute, setShowContribute] = useState(false);
   const [contributeForm, setContributeForm] = useState({
@@ -84,112 +59,6 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     content: '',
   });
   const [submitting, setSubmitting] = useState(false);
-
-  // Bình luận & đánh giá
-  const [discussions, setDiscussions] = useState<Discussions>(EMPTY_DISCUSSIONS);
-  const [commentText, setCommentText] = useState('');
-  const [commentName, setCommentName] = useState('');
-  const [discussionLoading, setDiscussionLoading] = useState(false);
-  const [commentBusy, setCommentBusy] = useState(false);
-  const [ratingBusy, setRatingBusy] = useState(false);
-
-  // Định danh người gửi: dùng tài khoản nếu đã đăng nhập, ngược lại dùng id thiết bị
-  const getOwnerKey = useCallback(() => {
-    if (user?.id) return 'user:' + user.id;
-    try {
-      let k = localStorage.getItem('preset_visitor_id');
-      if (!k) {
-        k = 'dev:' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-        localStorage.setItem('preset_visitor_id', k);
-      }
-      return k;
-    } catch {
-      return 'anon:' + Math.random().toString(36).slice(2);
-    }
-  }, [user]);
-
-  const loadDiscussions = useCallback(
-    async (id: string) => {
-      setDiscussionLoading(true);
-      try {
-        const res = await fetch(
-          `/api/community/presets/${encodeURIComponent(id)}/comments?owner=${encodeURIComponent(getOwnerKey())}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setDiscussions({
-            comments: Array.isArray(data.comments) ? data.comments : [],
-            rating: data.rating || { avg: 0, count: 0, mine: null },
-          });
-        }
-      } catch (err) {
-        console.warn('Không tải được bình luận:', err);
-      } finally {
-        setDiscussionLoading(false);
-      }
-    },
-    [getOwnerKey]
-  );
-
-  const handleRate = async (stars: number) => {
-    if (!activeItem || ratingBusy) return;
-    setRatingBusy(true);
-    try {
-      const res = await fetch(
-        `/api/community/presets/${encodeURIComponent(activeItem.id)}/rating`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating: stars, owner: getOwnerKey() }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const rating = data.rating;
-        setDiscussions((d) => ({ ...d, rating }));
-        setItems((prev) =>
-          prev.map((p) =>
-            p.id === activeItem.id
-              ? { ...p, avgRating: rating.avg, ratingCount: rating.count }
-              : p
-          )
-        );
-      }
-    } catch (err) {
-      console.warn('Không đánh giá được:', err);
-    } finally {
-      setRatingBusy(false);
-    }
-  };
-
-  const handleAddComment = async () => {
-    if (!activeItem || !commentText.trim() || commentBusy) return;
-    setCommentBusy(true);
-    try {
-      const res = await fetch(
-        `/api/community/presets/${encodeURIComponent(activeItem.id)}/comments`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: commentText, author: commentName }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.comment) {
-          setDiscussions((d) => ({ ...d, comments: [...d.comments, data.comment] }));
-          setCommentText('');
-        }
-      } else {
-        const e = await res.json().catch(() => ({}));
-        alert(e.error || 'Không gửi được bình luận.');
-      }
-    } catch (err) {
-      alert('Không kết nối được máy chủ. Vui lòng thử lại.');
-    } finally {
-      setCommentBusy(false);
-    }
-  };
 
   const refreshPresets = useCallback(async () => {
     try {
@@ -229,16 +98,15 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
   });
 
   const openReader = (item: CommunityPreset) => {
-    const updated = { ...item, views: (item.views || 0) + 1 };
-    setActiveItem(updated);
-    setItems((prev) => prev.map((p) => (p.id === item.id ? updated : p)));
-    setCommentText('');
-    setCommentName('');
-    loadDiscussions(item.id);
+    setItems((prev) =>
+      prev.map((p) => (p.id === item.id ? { ...p, views: (p.views || 0) + 1 } : p))
+    );
     fetch(`/api/community/presets/${item.id}/view`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     }).catch(() => {});
+    // Mở trang đọc bài mẫu riêng (thay vì modal)
+    window.location.hash = '#/preset/' + encodeURIComponent(item.id);
   };
 
   const handleImport = (item: CommunityPreset) => {
@@ -589,201 +457,6 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Preset Reader Modal */}
-      {activeItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  {activeItem.subject}
-                </span>
-                {activeItem.grade && (
-                  <span className="ml-1.5 text-xs font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-                    Lớp {activeItem.grade}
-                  </span>
-                )}
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-1">
-                  {activeItem.title}
-                </h2>
-                <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-500">
-                  <span>
-                    Bởi <b>{activeItem.author || 'Kho Học Liệu Mẫu'}</b>
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Eye className="w-3 h-3" />
-                    {activeItem.views || 0} lượt xem
-                  </span>
-                  {activeItem.avgRating ? (
-                    <span className="inline-flex items-center gap-1 text-amber-600">
-                      <Star className="w-3.5 h-3.5 fill-current" />
-                      {activeItem.avgRating} ({activeItem.ratingCount || 0} đánh giá)
-                    </span>
-                  ) : null}
-                  <button
-                    onClick={() => handleLike(activeItem)}
-                    className="inline-flex items-center gap-1 font-bold text-emerald-700"
-                  >
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                    {activeItem.likes || 0} thích
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleImport(activeItem)}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1"
-                >
-                  <BookmarkPlus className="w-3.5 h-3.5" />
-                  <span>Lưu vào vở của tôi</span>
-                </button>
-                <button
-                  onClick={() => setActiveItem(null)}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
-              <MarkdownRenderer content={activeItem.content} />
-
-              {/* Đánh giá & Bình luận */}
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
-                <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2 mb-3">
-                  <MessageCircle className="w-4 h-4 text-emerald-600" />
-                  Đánh giá & bình luận
-                </h3>
-
-                {/* Chọn số sao */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => handleRate(s)}
-                        disabled={ratingBusy}
-                        title={`${s} sao`}
-                        className="p-0.5 transition-transform hover:scale-125 disabled:opacity-60"
-                      >
-                        <Star
-                          className={`w-6 h-6 ${
-                            (discussions.rating.mine ?? 0) >= s
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-slate-300'
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                  <span className="text-xs font-bold text-slate-600">
-                    {discussions.rating.count > 0 ? (
-                      <>
-                        {discussions.rating.avg} / 5{' '}
-                        <span className="font-medium text-slate-400">
-                          ({discussions.rating.count} lượt)
-                        </span>
-                        {discussions.rating.mine ? (
-                          <span className="ml-1.5 text-[11px] text-emerald-600">
-                            • Bạn đã chấm {discussions.rating.mine} sao
-                          </span>
-                        ) : null}
-                      </>
-                    ) : (
-                      'Chưa có đánh giá — hãy là người đầu tiên!'
-                    )}
-                  </span>
-                </div>
-
-                {/* Danh sách bình luận */}
-                <div className="mt-4 space-y-2.5">
-                  {discussionLoading ? (
-                    <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Đang tải bình luận...
-                    </div>
-                  ) : discussions.comments.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">
-                      Chưa có bình luận nào. Chia sẻ nhận xét của bạn bên dưới nhé!
-                    </p>
-                  ) : (
-                    discussions.comments.map((c) => (
-                      <div
-                        key={c.id}
-                        className="bg-white rounded-xl border border-slate-100 p-3"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold shrink-0">
-                            {c.author.charAt(0) || '?'}
-                          </span>
-                          <span className="text-xs font-bold text-slate-700 truncate">
-                            {c.author}
-                          </span>
-                          <span className="text-[10px] text-slate-400 ml-auto shrink-0">
-                            {new Date(c.createdAt).toLocaleDateString('vi-VN', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1.5 leading-relaxed whitespace-pre-wrap break-words">
-                          {c.content}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Form thêm bình luận */}
-                <div className="mt-4 border-t border-slate-200 pt-4 space-y-2">
-                  <input
-                    value={commentName}
-                    onChange={(e) => setCommentName(e.target.value)}
-                    placeholder="Tên của bạn (không bắt buộc)"
-                    maxLength={60}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
-                  />
-                  <textarea
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="Chia sẻ cảm nhận về bài mẫu này..."
-                    rows={3}
-                    maxLength={2000}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none resize-none"
-                  />
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-[11px] text-slate-400 mr-auto">
-                      {commentText.length}/2000
-                    </span>
-                    <button
-                      onClick={handleAddComment}
-                      disabled={commentBusy || !commentText.trim()}
-                      className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {commentBusy ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Đang gửi...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          Gửi bình luận
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

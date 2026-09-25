@@ -3647,6 +3647,22 @@ Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
     }
   });
 
+  // API: Chi tiết 1 bài mẫu (dùng cho trang đọc bài riêng)
+  app.get("/api/community/presets/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const items = await loadAllPresets();
+      const item = items.find((x) => x.id === id);
+      if (!item) {
+        return res.status(404).json({ error: "Không tìm thấy bài mẫu." });
+      }
+      res.json({ item });
+    } catch (err: any) {
+      console.error("Error loading preset detail:", err);
+      res.status(500).json({ error: "Không tải được bài mẫu." });
+    }
+  });
+
   // API: Đóng góp bài mẫu mới vào kho chung
   app.post("/api/community/presets", async (req, res) => {
     try {

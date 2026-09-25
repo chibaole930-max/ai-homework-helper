@@ -42,6 +42,9 @@ const AdminTab = lazy(() => import('./components/AdminTab'));
 const SavedNotesTab = lazy(() =>
   import('./components/SavedNotesTab').then((m) => ({ default: m.SavedNotesTab }))
 );
+const PresetReaderPage = lazy(() =>
+  import('./components/PresetReaderPage').then((m) => ({ default: m.PresetReaderPage }))
+);
 
 const STORAGE_KEY = 'lop12_study_notebook_v1';
 const ANNOUNCE_KEY = 'announcement_dismissed_v1';
@@ -84,6 +87,10 @@ function AppContent() {
   const [isAdmin, setIsAdmin] = useState<boolean>(
     () => window.location.hash === '#/admin'
   );
+  const [presetId, setPresetId] = useState<string | null>(() => {
+    const m = window.location.hash.match(/^#\/preset\/(.+)$/);
+    return m ? decodeURIComponent(m[1]) : null;
+  });
   const [siteStatus, setSiteStatus] = useState<SiteStatus | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
   const [donateVisible, setDonateVisible] = useState(false);
@@ -107,11 +114,17 @@ const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
   const textbooks = TEXTBOOKS_BY_GRADE[grade];
   const gradeLabel = GRADE_LABELS[grade];
 
-  useEffect(() => {
-    const onHash = () => setIsAdmin(window.location.hash === '#/admin');
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+  const applyHash = useCallback(() => {
+    const h = window.location.hash;
+    setIsAdmin(h === '#/admin');
+    const m = h.match(/^#\/preset\/(.+)$/);
+    setPresetId(m ? decodeURIComponent(m[1]) : null);
   }, []);
+
+  useEffect(() => {
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, [applyHash]);
 
   useEffect(() => {
     const load = () => {
@@ -360,6 +373,14 @@ const handleSaveItem = async (itemData: Omit<SavedStudyItem, 'id' | 'date'>) => 
     );
   };
 
+const closePreset = useCallback(() => {
+    setPresetId(null);
+    setOpenFeature('presets');
+    if (window.location.hash.startsWith('#/preset/')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, []);
+
 if (isAdmin) {
     return (
       <div className="min-h-screen flex flex-col bg-transparent text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-900 relative">
@@ -367,6 +388,37 @@ if (isAdmin) {
         <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
           <AdminTab />
         </div>
+      </div>
+    );
+  }
+
+  // Trang đọc bài mẫu riêng (khi mở từ Kho bài mẫu hoặc qua URL #/preset/:id)
+  if (presetId) {
+    return (
+      <div className="h-dvh flex flex-col bg-transparent text-slate-800 font-sans overflow-hidden selection:bg-indigo-200/60 selection:text-indigo-950 relative z-10">
+        <FloatingBackground />
+        <Navbar
+          grade={grade}
+          onGradeChange={setGrade}
+          onlineCount={onlineCount}
+          onHome={closePreset}
+        />
+        <main className="flex-1 min-h-0 overflow-hidden relative">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-24 text-sm text-slate-400">
+                Đang mở bài mẫu…
+              </div>
+            }
+          >
+            <PresetReaderPage
+              presetId={presetId}
+              onSaveItem={handleSaveItem}
+              isItemSaved={isItemSaved}
+              onBack={closePreset}
+            />
+          </Suspense>
+        </main>
       </div>
     );
   }
