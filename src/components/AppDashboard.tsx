@@ -37,11 +37,9 @@ interface TileDef {
   feature: OpenFeature;
   number: string;
   title: string;
-  subtitle: string;
   icon: React.ElementType;
   accentBar: string;
   iconBg: string;
-  desc: string;
   chips: string[];
   cta: string;
 }
@@ -76,15 +74,8 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
             {tile.title}
           </h3>
         </div>
-        <p className="text-[11px] font-semibold text-slate-400 leading-tight shrink-0">
-          {tile.subtitle}
-        </p>
 
-        <p className="text-[11px] sm:text-xs text-slate-500 leading-snug line-clamp-2">
-          {tile.desc}
-        </p>
-
-        <div className="pt-1">
+        <div className="pt-0.5">
           <div className="flex flex-wrap gap-1">
             {tile.chips.map((c) => (
               <span
@@ -151,11 +142,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'notes',
       number: '1',
       title: 'Soạn Bài Ghi',
-      subtitle: 'AI soạn bài chuẩn pros',
       icon: Edit3,
       accentBar: 'bg-gradient-to-r from-indigo-400 to-blue-400',
       iconBg: 'bg-gradient-to-tr from-indigo-500 to-blue-400',
-      desc: 'Nhập bài học, chọn môn — nhận ngay bài ghi sạch đẹp, đúng trọng tâm, dễ học.',
       chips: subjects.slice(0, 5).map((s) => s.shortName),
       cta: 'Bắt đầu',
     },
@@ -163,11 +152,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'solver',
       number: '2',
       title: 'Giải Bài Tập',
-      subtitle: 'Giải đề bất kỳ từng bước',
       icon: Sparkles,
       accentBar: 'bg-gradient-to-r from-amber-400 to-orange-400',
       iconBg: 'bg-gradient-to-tr from-amber-400 to-orange-400',
-      desc: 'Dán đề bài vào, AI giải chi tiết từng bước, dễ hiểu, đúng chương trình.',
       chips: ['Toán', 'Văn', 'Anh', 'Lý', 'Hóa'],
       cta: 'Giải ngay',
     },
@@ -175,11 +162,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'presets',
       number: '3',
       title: 'Kho Bài Mẫu',
-      subtitle: 'Hàng trăm bài mẫu sẵn có',
       icon: Library,
       accentBar: 'bg-gradient-to-r from-violet-400 to-fuchsia-400',
       iconBg: 'bg-gradient-to-tr from-violet-500 to-fuchsia-400',
-      desc: 'Khám phá bài mẫu chất lượng theo từng môn & bài học, tải về Vở Ghi một chạm.',
       chips: ['Đủ môn', 'Chọn lọc', 'Miễn phí'],
       cta: 'Khám phá',
     },
@@ -187,14 +172,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'saved',
       number: '4',
       title: 'Vở Ghi',
-      subtitle: 'Tài liệu học của riêng bạn',
       icon: FolderHeart,
       accentBar: 'bg-gradient-to-r from-emerald-400 to-teal-400',
       iconBg: 'bg-gradient-to-tr from-emerald-400 to-teal-400',
-      desc:
-        savedItems.length > 0
-          ? `Bạn đang có ${savedItems.length} bài — mở ra học tiếp ngay nhé.`
-          : 'Chỗ lưu tất cả bài soạn & lời giải. Bắt đầu lưu bài đầu tiên nào!',
       chips:
         savedItems.length > 0
           ? savedItems.slice(0, 3).map((i) => i.subject.match(/^([^\s]+)/)?.[1] || i.subject)
@@ -205,11 +185,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'transcript',
       number: '5',
       title: 'Sổ Học Bạ',
-      subtitle: 'Đặt chỉ tiêu điểm TBM',
       icon: ClipboardList,
       accentBar: 'bg-gradient-to-r from-sky-400 to-cyan-400',
       iconBg: 'bg-gradient-to-tr from-sky-400 to-cyan-400',
-      desc: 'Nhập điểm TBM mong muốn theo từng môn, theo dõi tiến độ đạt được cả năm.',
       chips: ['Điểm TBM', 'Mục tiêu', 'Theo dõi'],
       cta: 'Mở sổ',
     },
@@ -217,11 +195,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'path',
       number: '6',
       title: 'Lộ Trình Học Tập',
-      subtitle: 'Lộ trình cá nhân hóa',
       icon: Route,
       accentBar: 'bg-gradient-to-r from-orange-400 to-amber-400',
       iconBg: 'bg-gradient-to-tr from-orange-400 to-amber-400',
-      desc: 'Khai mục tiêu của bạn, AI xây lộ trình học từng môn, từng giai đoạn phù hợp.',
       chips: ['Mục tiêu', 'Cá nhân hóa', 'AI'],
       cta: 'Tạo lộ trình',
     },
@@ -229,11 +205,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'flashcards',
       number: '7',
       title: 'Thẻ Học Thông Minh',
-      subtitle: 'Flashcards + lặp lại ngắt quãng',
       icon: BrainCircuit,
       accentBar: 'bg-gradient-to-r from-violet-400 to-purple-400',
       iconBg: 'bg-gradient-to-tr from-violet-500 to-purple-400',
-      desc: 'Tạo thẻ từ bài ghi Tiếng Anh, luyện lật thẻ và ôn lại đúng lịch 1-3-7-14-30 ngày để nhớ lâu.',
       chips: ['Từ vựng', 'Lật thẻ', 'Nhớ lâu'],
       cta: 'Học ngay',
     },
@@ -241,11 +215,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       feature: 'tips',
       number: '8',
       title: 'Mẹo Học Tập',
-      subtitle: 'Phương pháp học hiệu quả',
       icon: Lightbulb,
       accentBar: 'bg-gradient-to-r from-teal-400 to-emerald-400',
       iconBg: 'bg-gradient-to-tr from-teal-400 to-emerald-400',
-      desc: 'Cornell 5R, ghi nhớ ngắt quãng, sơ đồ tư duy, cung điện trí nhớ — bí kíp học siêu tốc.',
       chips: ['Cornell', 'Mindmap', 'Active recall'],
       cta: 'Xem mẹo',
     },
