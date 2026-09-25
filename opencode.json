@@ -5,19 +5,19 @@
     "@azumag/opencode-rate-limit-fallback"
   ],
   "default_agent": "build",
-  "model": "ollama/qwen2.5-coder:3b",
+  "model": "opencode/big-pickle",
   "agents": {
     "build": {
       "mode": "primary",
-      "model": "ollama/qwen2.5-coder:3b"
+      "model": "opencode/big-pickle"
     },
     "general": {
       "mode": "subagent",
-      "model": "ollama/qwen2.5-coder:3b"
+      "model": "opencode/big-pickle"
     },
     "explore": {
       "mode": "subagent",
-      "model": "ollama/qwen2.5-coder:3b"
+      "model": "opencode/big-pickle"
     }
   },
   "compaction": {
