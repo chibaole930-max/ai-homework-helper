@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { GradeId } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { Dropdown } from './Dropdown';
 
 export type TabType = 'notes' | 'solver' | 'saved' | 'presets';
 
@@ -87,24 +88,29 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          {/* Grade Switcher */}
-          <div className="flex items-center gap-1 px-1 py-1 rounded-xl bg-slate-100 border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 pl-1 pr-0.5 hidden lg:inline">
-              Lớp
-            </span>
-            <select
-              value={grade}
-              onChange={(e) => onGradeChange(e.target.value as GradeId)}
-              className="bg-white border border-slate-200 rounded-lg px-1 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
-              title="Chọn lớp"
-            >
-              {(['6', '7', '8', '9', '10', '11', '12'] as GradeId[]).map((g) => (
-                <option key={g} value={g}>
-                  Lớp {g}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Grade Switcher — dropdown tuỳ chỉnh (thay select native) */}
+          <Dropdown
+            value={grade}
+            onChange={(v) => onGradeChange(v as GradeId)}
+            label="Lớp"
+            title="Chọn lớp"
+            groups={[
+              {
+                label: 'Khối THCS',
+                options: (['06', '07', '08', '09'] as GradeId[]).map((g) => ({
+                  value: g,
+                  label: `Lớp ${g}`,
+                })),
+              },
+              {
+                label: 'Khối THPT',
+                options: (['10', '11', '12'] as GradeId[]).map((g) => ({
+                  value: g,
+                  label: `Lớp ${g}`,
+                })),
+              },
+            ]}
+          />
 
           {/* Auth & VIP (desktop) */}
           <button

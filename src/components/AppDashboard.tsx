@@ -92,7 +92,7 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
   );
 }
 
-const THCS_GRADES: GradeId[] = ['6', '7', '8', '9'];
+const THCS_GRADES: GradeId[] = ['06', '07', '08', '09'];
 const THPT_GRADES: GradeId[] = ['10', '11', '12'];
 
 const THCS_REQUIRED: SubjectInfo['id'][] = ['toan', 'van', 'anh', 'khtn', 'sudia', 'gdcd', 'tin', 'congnghe'];
@@ -237,7 +237,7 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
         <div className="relative z-10 flex-1 min-w-0">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-[11px] font-semibold mb-1.5 backdrop-blur-sm">
             <GraduationCap className="w-3.5 h-3.5" />
-            {isTHCS ? 'Khối THCS' : 'Khối THPT'} • Hỗ trợ học tập lớp {grade}
+            {isTHCS ? 'Khối THCS' : 'Khối THPT'} • Hỗ trợ học tập lớp {grade.replace(/^0/, '')}
           </span>
           <h1 className="text-base sm:text-xl font-extrabold tracking-tight leading-tight">
             Học giỏi – nhẹ nhàng hơn mỗi ngày

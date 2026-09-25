@@ -55,7 +55,7 @@ export const PresetLibraryTab: React.FC<PresetLibraryTabProps> = ({
     textbook: 'Kết nối tri thức với cuộc sống',
     title: '',
     author: '',
-    grade: (grade || '12') as string,
+    grade: (grade || '12').replace(/^0/, '') as string,
     content: '',
   });
   const [submitting, setSubmitting] = useState(false);

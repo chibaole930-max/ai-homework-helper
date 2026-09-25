@@ -100,9 +100,12 @@ function AppContent() {
   );
 
   useEffect(() => {
-const savedGrade = localStorage.getItem('selected_grade') as GradeId | null;
-    if (savedGrade === '6' || savedGrade === '7' || savedGrade === '8' || savedGrade === '9' || savedGrade === '10' || savedGrade === '11' || savedGrade === '12') {
-      setGrade(savedGrade);
+    const raw = localStorage.getItem('selected_grade');
+    // Chấp nhận cả mã cũ 1 chữ số (6-9) để tương thích dữ liệu đã lưu
+    const normalized = raw && raw.length === 1 ? `0${raw}` : raw;
+    const valid: GradeId[] = ['06', '07', '08', '09', '10', '11', '12'];
+    if (normalized && valid.includes(normalized as GradeId)) {
+      setGrade(normalized as GradeId);
     }
   }, []);
 
