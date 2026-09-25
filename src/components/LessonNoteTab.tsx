@@ -73,6 +73,12 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
   const [customNote, setCustomNote] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [generatedNote, setGeneratedNote] = useState<string>('');
+  // Pipeline trạng thái (soạn theo mục + QA)
+  const [pipeSections, setPipeSections] = useState<
+    { key: string; title: string; status: string }[]
+  >([]);
+  const [pipeCached, setPipeCached] = useState(false);
+  const [qaState, setQaState] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -202,6 +208,9 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
     setErrorMsg(null);
     setIsLoading(true);
     setIsEditing(false);
+    setPipeSections([]);
+    setPipeCached(false);
+    setQaState(null);
     scrollOutputIntoView();
 
     try {
@@ -219,6 +228,9 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
           customNote: customNote.trim(),
           sourceUrl: currentSubject.loigiaihayUrl || '',
           grade,
+          stream: true,
+          grounding: true,
+          pipeline: true,
         }),
       });
 
@@ -227,8 +239,90 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
         throw new Error(errorData.error || `Yêu cầu thất bại (${response.status})`);
       }
 
-      const data = await response.json();
-      setGeneratedNote(data.result);
+      const ctype = response.headers.get('content-type') || '';
+      if (ctype.includes('text/event-stream') && response.body) {
+        // --- Streaming (SSE): hiện chữ dần thay vì chờ black-box ---
+        setGeneratedNote('');
+        let acc = '';
+        let lastRender = Date.now();
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        const renderNow = () => {
+          const now = Date.now();
+          if (now - lastRender >= 280) {
+            lastRender = now;
+            setGeneratedNote(acc);
+          }
+        };
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let sep;
+          while ((sep = buf.indexOf('\n\n')) !== -1) {
+            const raw = buf.slice(0, sep);
+            buf = buf.slice(sep + 2);
+            let ev = 'message';
+            let data = '';
+            for (const line of raw.split('\n')) {
+              if (line.startsWith('event: ')) ev = line.slice(7);
+              else if (line.startsWith('data: ')) data = line.slice(6);
+            }
+            if (!data) continue;
+            let payload: any = null;
+            try {
+              payload = JSON.parse(data);
+            } catch {
+              continue;
+            }
+            if (ev === 'chunk') {
+              acc += (payload.text || '');
+              renderNow();
+            } else if (ev === 'replace') {
+              acc = payload.text || '';
+              renderNow();
+            } else if (ev === 'plan') {
+              const secs = Array.isArray(payload.sections) ? payload.sections : [];
+              setPipeSections(
+                secs.map((s: any) => ({
+                  key: s.key || '',
+                  title: s.title || '',
+                  status: 'pending',
+                }))
+              );
+            } else if (ev === 'section_start') {
+              setPipeSections((prev) =>
+                prev.map((s, i) => (i === payload.index ? { ...s, status: 'writing' } : s))
+              );
+            } else if (ev === 'section_done') {
+              setPipeSections((prev) =>
+                prev.map((s, i) => (i === payload.index ? { ...s, status: 'done' } : s))
+              );
+            } else if (ev === 'cached') {
+              setPipeCached(true);
+            } else if (ev === 'qa') {
+              if (payload.phase === 'start') setQaState('Đang rà soát độ chính xác...');
+              else if (payload.fixing) setQaState(`Đang sửa ${payload.issues} lỗi phát hiện...`);
+              else if (payload.done)
+                setQaState(
+                  payload.issues === 0
+                    ? 'Đã rà soát: không phát hiện lỗi'
+                    : `Đã sửa ${payload.issues} lỗi`
+                );
+            } else if (ev === 'error') {
+              throw new Error(payload.error || 'Lỗi khi tạo bài soạn.');
+            }
+          }
+        }
+        setGeneratedNote(acc);
+      } else {
+        // Fallback JSON (bản server cũ / không hỗ trợ stream)
+        const data = await response.json();
+        setGeneratedNote(data.result);
+      }
+
       setUsage((prev) =>
         prev
           ? {
@@ -882,21 +976,74 @@ export const LessonNoteTab: React.FC<LessonNoteTabProps> = ({
             {/* Output Body */}
             <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
               {isLoading ? (
-                <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-center space-y-4 py-16">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center animate-pulse">
-                      <Sparkles className="w-8 h-8 text-indigo-600 animate-spin" />
+                generatedNote ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pipeCached && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-700">
+                          <Sparkles className="w-3 h-3" />
+                          Lấy từ bộ nhớ — đã soạn trước
+                        </span>
+                      )}
+                      {pipeSections.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {pipeSections.map((s) => (
+                            <span
+                              key={s.key + s.title}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-colors ${
+                                s.status === 'done'
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                  : s.status === 'writing'
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                    : 'bg-white border-slate-200 text-slate-400'
+                              }`}
+                            >
+                              {s.status === 'done' ? (
+                                <CheckCircle2 className="w-3 h-3" />
+                              ) : s.status === 'writing' ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <BookOpen className="w-3 h-3" />
+                              )}
+                              <span className="truncate max-w-[140px]">{s.title}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {qaState && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-700">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          {qaState}
+                        </span>
+                      )}
+                    </div>
+                    <div className="prose prose-slate max-w-none">
+                      {isEnglishSubject && vocabWords.length > 0 && (
+                        <EnglishVocabulary
+                          words={vocabWords}
+                          lessonTitle={lessonTitle}
+                        />
+                      )}
+                      <MarkdownRenderer content={cleanedNoteContent} />
                     </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-base">
-                      Đang soạn bài {currentSubject.shortName} {gradeLabel}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                      Tổng hợp cấu trúc chuẩn GDPT 2018, trích lọc công thức và câu hỏi củng cố...
-                    </p>
+                ) : (
+                  <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-center space-y-4 py-16">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center animate-pulse">
+                        <Sparkles className="w-8 h-8 text-indigo-600 animate-spin" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-base">
+                        Đang soạn bài {currentSubject.shortName} {gradeLabel}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                        Tìm tài liệu loigiaihay & tổng hợp cấu trúc chuẩn GDPT 2018...
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )
               ) : generatedNote ? (
                 isEditing ? (
                   <div className="h-full flex flex-col space-y-2">

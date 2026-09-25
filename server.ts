@@ -503,7 +503,219 @@ async function setPresetRating(
 }
 
 // ---------------------------------------------------------------------------
-// BÀI MẪU CHỜ DUYỆT (pending) — tự động từ AI soạn bài, hoặc chia sẻ thủ công
+// GROUNDING — LẤY NỘI DUNG THẬT TỪ LOIGIAIHAY.COM ĐỂ SOẠN BÀI BÁM SÁT
+// - 1) Tìm URL bài con từ trang môn (cache theo subject URL 24h)
+// - 2) Fetch trang bài → rút nội dung chính → cache theo bài URL (7 ngày)
+// - Token tiết kiệm nhờ cache + chỉ lấy phần nội dung chính (bỏ nav/script).
+// ---------------------------------------------------------------------------
+
+const GROUND_CACHE_FILE = path.join(process.cwd(), "data", "grounding-cache.json");
+const GROUND_UA =
+  "Mozilla/5.0 (compatible; StudyEZ-Bot/1.0; +https://hoctaptot.us.ci) AppleWebKit/537.36";
+
+let _groundCache: Record<string, string> | null = null;
+function loadGroundCache(): Record<string, string> {
+  if (_groundCache) return _groundCache;
+  try {
+    if (fs.existsSync(GROUND_CACHE_FILE)) {
+      _groundCache = JSON.parse(fs.readFileSync(GROUND_CACHE_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.warn("[Grounding] Không đọc được cache:", err);
+  }
+  _groundCache = _groundCache || {};
+  return _groundCache;
+}
+function saveGroundCache() {
+  try {
+    fs.mkdirSync(path.dirname(GROUND_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(GROUND_CACHE_FILE, JSON.stringify(_groundCache), "utf-8");
+  } catch (err) {
+    console.warn("[Grounding] Không ghi được cache:", err);
+  }
+}
+
+async function fetchHtml(url: string): Promise<string | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch(url, {
+      headers: { "user-agent": GROUND_UA, accept: "text/html,*/*" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      console.warn(`[Grounding] fetch ${url} -> HTTP ${res.status}`);
+      return null;
+    }
+    return await res.text();
+  } catch (err: any) {
+    console.warn("[Grounding] fetch lỗi:", String(err).slice(0, 120));
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Lấy danh sách link bài (article) từ HTML trang môn, kèm title. */
+function extractLessonLinks(html: string): { title: string; url: string }[] {
+  const out: { title: string; url: string }[] = [];
+  const re = /<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1].trim();
+    if (!/^\/?.+a\d+\.html$/.test(href)) continue; // bài có article id
+    if (/pdf|sgk-?van-?[0-9]+-?tap|pdf$/i.test(href)) continue; // bỏ pdf/tập
+    const rawText = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!rawText || rawText.length < 4) continue;
+    const url = href.startsWith("http") ? href : "https://loigiaihay.com" + (href.startsWith("/") ? href : "/" + href);
+    out.push({ title: rawText, url });
+  }
+  // khử trùng theo url
+  const seen = new Set<string>();
+  return out.filter((x) => (seen.has(x.url) ? false : (seen.add(x.url), true)));
+}
+
+/** Rút nội dung chính (article/main dài nhất), bỏ nav, script, style, footer, aside. */
+function cleanArticleText(html: string): string {
+  let h = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
+  h = h
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<aside[\s\S]*?<\/aside>/gi, " ")
+    .replace(/<header[\s\S]*?<\/header>/gi, " ");
+
+  // Chọn <article> hoặc <main> DÀI NHẤT (tránh bắt nhầm article quảng cáo rỗng)
+  const candidates: string[] = [];
+  const addCandidates = (tag: string) => {
+    const re = new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, "gi");
+    let m: RegExpExecArray | null;
+    let bestLen = 0;
+    let best = "";
+    while ((m = re.exec(h)) !== null) {
+      if (m[0].length > bestLen) {
+        bestLen = m[0].length;
+        best = m[0];
+      }
+    }
+    if (best) candidates.push(best);
+  };
+  addCandidates("article");
+  addCandidates("main");
+
+  let picked = candidates.sort((a, b) => b.length - a.length)[0] || h;
+  const text = picked.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.length > 200 ? text : " " + h + " ";
+}
+
+/** Chuẩn hoá tiếng Việt để so khớp tên bài. */
+function normTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Bước 1: tìm URL bài con theo tên bài từ trang môn (cache 24h). */
+async function discoverLessonUrl(subjectUrl: string, lessonTitle: string): Promise<string | null> {
+  const key = "links:" + subjectUrl;
+  const cache = loadGroundCache();
+  let links: { title: string; url: string }[] = [];
+  if (cache[key]) {
+    try {
+      links = JSON.parse(cache[key]);
+    } catch {
+      links = [];
+    }
+  }
+  if (links.length === 0) {
+    const html = await fetchHtml(subjectUrl);
+    if (!html) return null;
+    links = extractLessonLinks(html);
+    cache[key] = JSON.stringify(links);
+    saveGroundCache();
+    console.log(`[Grounding] Có ${links.length} link bài từ trang môn.`);
+  }
+  const want = normTitle(lessonTitle);
+  if (!want) return null;
+  const words = want.split(" ").filter((w) => w.length > 2);
+  if (words.length === 0) return null;
+  let best: { title: string; url: string; score: number } | null = null;
+  for (const l of links) {
+    const t = normTitle(l.title);
+    if (!t) continue;
+    let score = 0;
+    for (const w of words) if (t.includes(w)) score += 1;
+    if (score > 0 && (!best || score > best.score)) best = { score, url: l.url, title: l.title };
+  }
+  return best && best.score >= Math.max(1, Math.ceil(words.length / 2)) ? best.url : null;
+}
+
+/** Grounding tổng hợp: URL bài + nội dung thật (cache 7 ngày theo bài URL). */
+async function retrieveLessonSource(
+  subjectUrl: string,
+  lessonTitle: string
+): Promise<{ url?: string; text?: string } | null> {
+  const cache = loadGroundCache();
+  const url = await discoverLessonUrl(subjectUrl, lessonTitle);
+  if (!url) {
+    console.warn("[Grounding] Không tìm được bài con cho:", lessonTitle);
+    return null;
+  }
+  const key = "page:" + url;
+  let text: string | null = null;
+  if (cache[key] && (cache[key] as string).length >= 120) {
+    text = cache[key];
+  } else {
+    const html = await fetchHtml(url);
+    if (html) {
+      text = cleanArticleText(html);
+      // giới hạn độ dài nguồn để tiết kiệm token (giữ ~8k ký tự quan trọng nhất)
+      if (text.length > 7000) text = text.slice(0, 7000);
+      cache[key] = text;
+      saveGroundCache();
+    }
+  }
+  if (!text || text.length < 120) {
+    console.warn("[Grounding] Nội dung không đủ dài:", lessonTitle);
+    return null;
+  }
+  return { url, text };
+}
+
+// Tự đẩy bài soạn tự động vào hàng chờ duyệt (không làm hỏng response nếu lỗi)
+async function autoEnqueuePendingNote(opts: {
+  lessonTitle: string;
+  subject: string;
+  subjectId: string;
+  textbook: string;
+  content: string;
+  noteStyle: string;
+}) {
+  try {
+    await insertPendingPreset({
+      id: "pending-auto-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
+      type: "note",
+      title: String(opts.lessonTitle).trim().slice(0, 150),
+      subject: String(opts.subject).trim(),
+      subjectId: String(opts.subjectId || "").trim(),
+      textbook: opts.textbook ? String(opts.textbook).trim() : "Kết nối tri thức với cuộc sống",
+      content: opts.content.slice(0, 20000),
+      date: new Date().toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+      style: opts.noteStyle || "standard",
+      author: "Bản soạn tự động",
+      source: "auto",
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.warn("[Pending] Không tự động đề xuất được bài mẫu:", err);
+  }
+}
 // - Bài mẫu chỉ vào Kho công khai sau khi admin duyệt.
 // - Lưu PostgreSQL (bảng pending_presets) hoặc file JSON fallback.
 // ---------------------------------------------------------------------------
@@ -1179,6 +1391,395 @@ async function generateContentWithFallback(
   }
 
   throw lastError || new Error("Không thể kết nối đến mô hình AI sau khi đã thử các phương án dự phòng.");
+}
+
+// Streaming: giống chuỗi fallback ở trên nhưng trả về đối tượng stream của Gemini
+// để handler có thể đẩy token ra SSE từng phần.
+async function generateContentStreamWithFallback(
+  entries: GeminiClientEntry[],
+  params: { contents: any; config?: any; preferredModel?: string }
+): Promise<{ stream: any; model: string; key: string }> {
+  let lastError: any = null;
+  for (let k = 0; k < entries.length; k++) {
+    const { client: ai, key } = entries[k];
+    if (getAiKeyRemaining(key) <= 0) continue;
+    const usableModels = getUsableModelsFor(key, params.preferredModel);
+    if (usableModels.length === 0) continue;
+    const stat = getGeminiKeyStatsFor(key);
+    for (let i = 0; i < usableModels.length; i++) {
+      const model = usableModels[i];
+      bumpAiUsage(key, model);
+      try {
+        const stream = await ai.models.generateContentStream({
+          model,
+          contents: params.contents,
+          config: {
+            ...(params.config || {}),
+            maxOutputTokens:
+              params.config?.maxOutputTokens ?? (model.includes("lite") ? 8192 : 16384),
+          },
+        });
+        stat.requests += 1;
+        stat.lastUsedAt = Date.now();
+        return { stream, model, key };
+      } catch (err: any) {
+        lastError = err;
+        stat.failures += 1;
+        stat.lastError = parseGeminiErrorMessage(err).slice(0, 200);
+        const errMsg = err?.message || String(err);
+        console.warn(
+          `[Gemini][stream] key#${k + 1} ${maskGeminiKey(key)} model ${model} lỗi:`,
+          errMsg.slice(0, 200)
+        );
+        if (errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+          if (!/per minute/i.test(errMsg) && /day|daily|per_day|24h|quota/i.test(errMsg)) {
+            markModelExhausted(key, model);
+          }
+        }
+      }
+    }
+  }
+  throw lastError || new Error("Không thể khởi tạo luồng AI sau khi đã thử các phương án dự phòng.");
+}
+
+// ---------------------------------------------------------------------------
+// PIPELINE "CHUẨN XÁC HOÁ" — soạn bài theo mục + QA đối chiếu nguồn
+// Chế độ 1 yêu cầu = 1 lượt user (các call nội bộ flash-lite không trừ quota user).
+// ---------------------------------------------------------------------------
+
+const NOTE_CACHE_FILE = path.join(process.cwd(), "data", "note-cache.json");
+let _noteCache: Record<string, string> | null = null;
+function loadNoteCache(): Record<string, string> {
+  if (_noteCache) return _noteCache;
+  try {
+    if (fs.existsSync(NOTE_CACHE_FILE)) {
+      _noteCache = JSON.parse(fs.readFileSync(NOTE_CACHE_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.warn("[NoteCache] không đọc được:", err);
+  }
+  _noteCache = _noteCache || {};
+  return _noteCache;
+}
+function saveNoteCache() {
+  try {
+    fs.mkdirSync(path.dirname(NOTE_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(NOTE_CACHE_FILE, JSON.stringify(_noteCache), "utf-8");
+  } catch (err) {
+    console.warn("[NoteCache] không ghi được:", err);
+  }
+}
+function noteCacheKey(o: {
+  subject: string;
+  textbook: string;
+  lessonTitle: string;
+  noteStyle: string;
+  loigiaihaySection: string;
+  detailLevel: string;
+  groundUrl?: string;
+}) {
+  return crypto
+    .createHash("sha1")
+    .update(
+      [o.subject, o.textbook, o.lessonTitle, o.noteStyle, o.loigiaihaySection, o.detailLevel, o.groundUrl || ""].join("|")
+    )
+    .digest("hex");
+}
+
+/** Cắt đoạn nguồn liên quan tới 1 mục (theo từ khoá) để tiết kiệm token. */
+function extractSectionGround(text: string, focusKeywords: string[]): string {
+  const t = normTitle(text);
+  let bestPos = -1;
+  let bestKw = "";
+  for (const kw of focusKeywords) {
+    const w = normTitle(kw);
+    if (!w || w.length < 3) continue;
+    const pos = t.indexOf(w);
+    if (pos !== -1 && (bestPos === -1 || pos < bestPos)) {
+      bestPos = pos;
+      bestKw = w;
+    }
+  }
+  if (bestPos === -1) return text.slice(0, 2400);
+  const start = Math.max(0, bestPos - 220);
+  return text.slice(start, start + 2800);
+}
+
+/** Gọi LLM và lấy text, có parse JSON an toàn (gỡ code fences). */
+async function generateTextOnce(
+  aiClients: GeminiClientEntry[],
+  opts: { contents: any; config?: any; preferredModel?: string }
+): Promise<string> {
+  const resp = await generateContentWithFallback(aiClients, {
+    contents: opts.contents,
+    config: { temperature: 0.3, ...(opts.config || {}) },
+    ...(opts.preferredModel ? { preferredModel: opts.preferredModel } : {}),
+  });
+  return resp.text || "";
+}
+
+function parseLLMJson(text: string): any {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+const ACCURACY_SYSTEM = `Bạn là biên tập viên soạn bài chịu trách nhiệm TUYỆT ĐỐI về tính chuẩn xác thông tin.
+Nguyên tắc:
+- MỌI thông tin "chuẩn" phải lấy từ NGUỒN được cung cấp. Không thêm số liệu, ngày tháng, công thức, tên mục, câu hỏi ngoài nguồn.
+- Khi cần bổ sung kiến thức ngoài nguồn: đóng vào khối riêng "📎 Tham khảo thêm (ngoài nguồn)" để học sinh biết không phải của nguồn.
+- Nếu nguồn thiếu phần nội dung → được bổ sung nhưng PHẢI nằm trong khối Tham khảo, không trộn lẫn với phần chuẩn.
+- Định dạng chuẩn Lời Giải Hay: Đề bài → Phương pháp giải → Lời giải chi tiết → Kết luận/Đáp số.`;
+
+interface PipelineSection {
+  key: string;
+  title: string;
+  focus: string;
+}
+
+async function planSections(
+  aiClients: GeminiClientEntry[],
+  opts: {
+    subject: string;
+    gradeLabel: string;
+    textbook: string;
+    lessonTitle: string;
+    groundText: string;
+  },
+  clientSections?: PipelineSection[]
+): Promise<PipelineSection[]> {
+  if (clientSections && clientSections.length > 0) return clientSections;
+  const raw = await generateTextOnce(aiClients, {
+    contents: `Hãy lập KẾ HOẠCH các mục (I, II, III...) của bài học "${opts.lessonTitle}" (môn ${opts.subject}, ${opts.gradeLabel}, sách ${opts.textbook}).
+Dựa vào NGUỒN thật dưới đây (đã có cấu trúc câu hỏi/hoạt động của SGK):
+NGUỒN:\n"""\n${opts.groundText.slice(0, 5000)}\n"""\n
+Trả về JSON đúng schema:
+{"sections":[{"key":"I","title":"Tên mục ngắn gọn","focus":"nội dung trọng tâm mục + danh sách câu hỏi/hoạt động trong mục"},...]}
+Yêu cầu: tối thiểu 2, tối đa 5 mục; tiêu chí chia theo đúng mục lớn trong nguồn. KHÔNG bịa mục không có trong nguồn.`,
+    config: {
+      systemInstruction:
+        "Bạn là chuyên gia sư phạm GDPT 2018. Luôn trả về JSON hợp lệ, không kèm text ngoài.",
+      responseMimeType: "application/json",
+      temperature: 0.2,
+    },
+  });
+  const parsed = parseLLMJson(raw);
+  const list = parsed?.sections || parsed;
+  if (!Array.isArray(list)) throw new Error("Planner không trả được danh sách mục.");
+  return list
+    .slice(0, 5)
+    .map((s: any, i: number) => ({
+      key: s.key || ["I", "II", "III", "IV", "V"][i] || String(i + 1),
+      title: String(s.title || s.name || "Mục " + (i + 1)).slice(0, 80),
+      focus: String(s.focus || "").slice(0, 300),
+    }))
+    .filter((s) => s.title);
+}
+
+async function draftSection(
+  aiClients: GeminiClientEntry[],
+  opts: {
+    section: PipelineSection;
+    subject: string;
+    gradeLabel: string;
+    textbook: string;
+    lessonTitle: string;
+    noteStyle: string;
+    groundUrl: string;
+    groundText: string;
+  }
+): Promise<string> {
+  const seg = extractSectionGround(opts.groundText, [
+    opts.section.focus,
+    opts.section.title,
+  ]);
+  const prompt = `SOẠN MỤC ${opts.section.key}. ${opts.section.title} — BÀI "${opts.lessonTitle}" (${opts.subject}, ${opts.gradeLabel}, ${opts.textbook}).
+Nguồn loigiaihay: ${opts.groundUrl}
+
+ĐOẠN NGUỒN LIÊN QUAN MỤC:
+"""\n${seg}\n"""
+
+YÊU CẦU MỤC:
+- Trình bày đúng phong cách Lời Giải Hay: lý thuyết trọng tâm + GIẢI các câu hỏi/hoạt động trong mục (Đề bài → Phương pháp giải → Lời giải chi tiết → Kết luận/Đáp số).
+- Phần nội dung "chuẩn" CHỈ lấy từ đoạn nguồn trên.
+- Nội dung cần bổ sung mà nguồn thiếu → để trong khối riêng bắt đầu bằng: "> 📎 Tham khảo thêm (ngoài nguồn):".
+- KHÔNG bịa số liệu/ngày tháng/công thức. Nếu mâu thuẫn giữa nguồn và kiến thức → theo nguồn và ghi chú ngắn.
+- Tiêu đề mục dạng: ### ${opts.section.key}. ${opts.section.title}.
+- Trả đúng nội dung mục này, không thêm mục khác. Dùng Markdown.`;
+  return generateTextOnce(aiClients, {
+    contents: prompt,
+    config: { systemInstruction: ACCURACY_SYSTEM, temperature: 0.3, maxOutputTokens: 4096 },
+    preferredModel: "gemini-3.1-flash-lite",
+  });
+}
+
+async function qaCheck(
+  aiClients: GeminiClientEntry[],
+  opts: { lessonTitle: string; doc: string; groundUrl: string; groundText: string }
+): Promise<{ issues: { sectionKey: string; problem: string; fix: string }[]; uncertain: string[] }> {
+  const raw = await generateTextOnce(aiClients, {
+    contents: `RÀ SOÁT độ chính xác của bài soạn "${opts.lessonTitle}".
+BÀI SOẠN:\n"""\n${opts.doc.slice(0, 14000)}\n"""\n
+NGUỒN ĐỐI CHIẾU:\n"""\n${opts.groundText.slice(0, 9000)}\n"""\n
+Kiểm tra: (1) số liệu/ngày tháng/công thức có khớp nguồn không, (2) mục nào trống hoặc bị cắt, (3) phần "[Tham khảo]" có được tách rõ không, (4) có sai sót nào hiển nhiên không.
+Trả JSON:
+{"issues":[{"sectionKey":"I","problem":"mô tả ngắn","fix":"lệnh sửa cụ thể, làm được ngay"}],
+ "uncertain":["điều chưa chắc so với nguồn, cần gắn [?]"]}`,
+    config: {
+      systemInstruction:
+        "Bạn là chuyên gia kiểm định nội dung giáo dục. Trả JSON hợp lệ, ngắn gọn. Nếu bài đã chuẩn → issues = [].",
+      responseMimeType: "application/json",
+      temperature: 0.1,
+    },
+  });
+  const p = parseLLMJson(raw);
+  return {
+    issues: Array.isArray(p?.issues) ? p.issues.slice(0, 8) : [],
+    uncertain: Array.isArray(p?.uncertain) ? p.uncertain.slice(0, 8) : [],
+  };
+}
+
+async function applyFix(
+  aiClients: GeminiClientEntry[],
+  opts: { lessonTitle: string; doc: string; issues: { sectionKey: string; problem: string; fix: string }[] }
+): Promise<string> {
+  const fixes = opts.issues
+    .map((i) => `- [${i.sectionKey}] ${i.problem}\n   => ${i.fix}`)
+    .join("\n");
+  const raw = await generateTextOnce(aiClients, {
+    contents: `Sửa bài soạn "${opts.lessonTitle}" theo danh sách lỗi dưới đây. Giữ nguyên phần không lỗi.
+BÀI SOẠN:\n"""\n${opts.doc.slice(0, 14000)}\n"""\n
+LỖI CẦN SỬA:\n${fixes}\n
+Trả lại TOÀN BỘ bài soạn đã sửa, đúng Markdown.`,
+    config: { systemInstruction: ACCURACY_SYSTEM, temperature: 0.2, maxOutputTokens: 16384 },
+  });
+  return raw || opts.doc;
+}
+
+// Pipeline chính: trả nội dung cuối + danh sách section (để UI hiện stepper) + nguồn ground
+async function runNotePipeline(
+  aiClients: GeminiClientEntry[],
+  opts: {
+    subject: string;
+    subjectId: string;
+    textbook: string;
+    lessonTitle: string;
+    noteStyle: string;
+    loigiaihaySection: string;
+    detailLevel: string;
+    lessonUri: string;
+    gradeLabel: string;
+    clientSections?: PipelineSection[];
+  },
+  emit: (event: string, data: any) => void
+): Promise<{ content: string; sections: PipelineSection[]; groundUrl: string; cached: boolean }> {
+  // 0) Grounding (lấy hoặc từ cache)
+  const ground = await retrieveLessonSource(opts.lessonUri, opts.lessonTitle);
+  if (!ground || !ground.text) {
+    throw new Error("Không tìm được nguồn loigiaihay cho bài này để soạn chuẩn xác.");
+  }
+
+  // 0b) Cache hit?
+  const ck = noteCacheKey({
+    subject: opts.subject,
+    textbook: opts.textbook,
+    lessonTitle: opts.lessonTitle,
+    noteStyle: opts.noteStyle,
+    loigiaihaySection: opts.loigiaihaySection,
+    detailLevel: opts.detailLevel,
+    groundUrl: ground.url,
+  });
+  const hit = loadNoteCache()[ck];
+  if (hit) {
+    emit("cached", { ok: true });
+    emit("plan", { sections: [] });
+    emit("chunk", { text: hit, index: 0 });
+    emit("done", { ok: true, cached: true });
+    return { content: hit, sections: [], groundUrl: ground.url, cached: true };
+  }
+
+  // 1) Planner
+  emit("ground", { url: ground.url });
+  const sections = await planSections(
+    aiClients,
+    {
+      subject: opts.subject,
+      gradeLabel: opts.gradeLabel,
+      textbook: opts.textbook,
+      lessonTitle: opts.lessonTitle,
+      groundText: ground.text,
+    },
+    opts.clientSections
+  );
+  emit("plan", { sections });
+
+  // 2) Draft từng mục (tuần tự), stream từng phần
+  const parts: string[] = [];
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    emit("section_start", { index: i, key: sec.key, title: sec.title });
+    const text = await draftSection(aiClients, {
+      section: sec,
+      subject: opts.subject,
+      gradeLabel: opts.gradeLabel,
+      textbook: opts.textbook,
+      lessonTitle: opts.lessonTitle,
+      noteStyle: opts.noteStyle,
+      groundUrl: ground.url as string,
+      groundText: ground.text as string,
+    });
+    parts.push(text);
+    emit("chunk", { text, index: i });
+    emit("section_done", { index: i, key: sec.key });
+  }
+  const firstAssemble =
+    parts.join("\n\n") +
+    `\n\n---\n> 📚 <b>Nguồn đối chiếu:</b> [loigiaihay.com](${ground.url}) — bài "${opts.lessonTitle}"`;
+
+  // 3) QA + fix
+  emit("qa", { phase: "start" });
+  const qa = await qaCheck(aiClients, {
+    lessonTitle: opts.lessonTitle,
+    doc: firstAssemble,
+    groundUrl: ground.url as string,
+    groundText: ground.text as string,
+  });
+  let finalContent = firstAssemble;
+  if (qa.issues.length > 0) {
+    emit("qa", { issues: qa.issues.length, fixing: true });
+    finalContent = await applyFix(aiClients, {
+      lessonTitle: opts.lessonTitle,
+      doc: firstAssemble,
+      issues: qa.issues,
+    });
+    emit("replace", { text: finalContent });
+  }
+  if (qa.uncertain.length > 0) {
+    // gắn nhãn [?] ở cuối để học sinh/admin để ý
+    const notes =
+      "\n\n> ⚠️ **Một số phần chưa đối chiếu chắc với nguồn (cần xem lại):**\n" +
+      qa.uncertain.map((u) => `> - ${u}`).join("\n");
+    finalContent += notes;
+    emit("chunk", { text: notes, index: -1 });
+  }
+  emit("qa", { done: true, issues: qa.issues.length, uncertain: qa.uncertain.length });
+
+  // 4) Cache + done
+  loadNoteCache()[ck] = finalContent;
+  saveNoteCache();
+  emit("done", { ok: true, cached: false });
+  return { content: finalContent, sections, groundUrl: ground.url as string, cached: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -3190,6 +3791,9 @@ const next: SiteSettings = {
         customNote = "",
         sourceUrl = "",
         grade,
+        stream = false,
+        grounding = true,
+        pipeline = false,
       } = req.body;
 
       const gradeLabel = grade ? `Lớp ${grade}` : "Lớp 12";
@@ -3217,6 +3821,59 @@ const next: SiteSettings = {
       if (!(await checkAiUsageLimit(req, res))) return;
 
       const aiClients = getGeminiClients();
+
+      // === PIPELINE (soạn theo mục + QA) ===
+      if (req.body?.pipeline) {
+        let headersSent = false;
+        const send = (event: string, data: any) => {
+          if (!headersSent) {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
+            });
+            res.flushHeaders?.();
+            headersSent = true;
+          }
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+        try {
+          const result = await runNotePipeline(
+            aiClients,
+            {
+              subject: String(subject).trim(),
+              subjectId: String(subjectId || "").trim(),
+              textbook: textbook ? String(textbook).trim() : "Kết nối tri thức với cuộc sống",
+              lessonTitle: String(lessonTitle).trim(),
+              noteStyle: String(noteStyle || "loigiaihay_full"),
+              loigiaihaySection: String(loigiaihaySection || "all"),
+              detailLevel: String(detailLevel || "standard"),
+              lessonUri: String(sourceUrl || "").trim(),
+              gradeLabel,
+              clientSections: req.body?.sections,
+            },
+            send
+          );
+          await incrementUsage(usageKey(req));
+          await bumpStat("lesson_note", req).catch(() => {});
+          if (headersSent) {
+            res.end();
+          } else {
+            res.json({ result: result.content, cached: result.cached });
+          }
+          return;
+        } catch (err: any) {
+          console.error("[Pipeline] Lỗi, thử lại bằng luồng 1-pass:", String(err).slice(0, 160));
+          if (headersSent) {
+            send("error", { error: parseGeminiErrorMessage(err), fallback: true });
+            await incrementUsage(usageKey(req)).catch(() => {});
+            res.end();
+            return;
+          }
+          // Chưa gửi header → rơi xuống luồng 1-pass bên dưới (không chặn học sinh)
+        }
+      }
 
       const systemInstruction = `Bạn là chuyên gia sư phạm hàng đầu Việt Nam, bám sát hệ thống học liệu và phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com) dành cho học sinh ${gradeLabel} theo Chương trình Giáo dục Phổ thông mới (GDPT 2018 - bộ sách Kết nối tri thức với cuộc sống, Cánh diều, Chân trời sáng tạo) và định hướng ${examFocus}.
 Phong cách Lời Giải Hay (loigiaihay.com) đặc trưng bởi:
@@ -3315,6 +3972,24 @@ E. 🗣️ TỪ VỰNG TRỌNG TÂM CỦA UNIT (PHẦN BẮT BUỘC, ĐẶT NGAY
         sectionFilter = "\n[YÊU CẦU ĐẶC BIỆT: Tập trung giải trọn vẹn BÀI TẬP TRONG SÁCH BÀI TẬP (SBT)]";
       }
 
+      // Grounding: lấy nội dung thật từ loigiaihay.com để bám sát (tắt bằng grounding:false)
+      let groundSource: { url?: string; text?: string } | null = null;
+      if (grounding && sourceUrl) {
+        try {
+          groundSource = await retrieveLessonSource(
+            String(sourceUrl).trim(),
+            String(lessonTitle).trim()
+          );
+        } catch (err: any) {
+          console.warn("[Grounding] lỗi tổng thể, bỏ qua:", String(err).slice(0, 160));
+        }
+      }
+      const groundBlock = groundSource?.text
+        ? `\n\nNGUỒN TÀI LIỆU THẬT (LẤY TỪ: ${groundSource.url}) — DỰA CHẶT VÀO NGUỒN NÀY LÀM CĂN CỨ SOẠN BÀI (đúng tên mục, đúng số thứ tự câu hỏi, đúng bài tập trong SGK/SBT, được phép diễn giải rõ ràng hơn) — TUYỆT ĐỐI KHÔNG THÊM mục/câu hỏi/bài tập KHÔNG CÓ trong nguồn:\n"\"\""
+${groundSource.text}
+"\"\""`
+        : "";
+
       const prompt = `YÊU CẦU SOẠN BÀI ${gradeLabel.toUpperCase()} THEO NGUỒN VÀ CHUẨN LỜI GIẢI HAY (loigiaihay.com):
 - Môn học: ${subject}
 - Khối lớp: ${gradeLabel}
@@ -3329,10 +4004,66 @@ ${sectionFilter}
 
 ${promptGoal}
 
+${groundBlock}
+
 Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chuẩn mực của Lời Giải Hay (loigiaihay.com), trình bày bằng Markdown rõ ràng, đẹp mắt, chia các đề mục rành mạch, dùng ký hiệu khoa học / công thức toán học chuẩn xác, dễ đọc trên cả điện thoại và máy tính.
 
 ⚠️ RÀ SOÁT CUỐI (LÀM TRƯỚC KHI NGỪNG): đảm bảo đã có đủ (1) đầy đủ mọi mục I, II, III... của bài học, (2) giải hết mọi câu hỏi Khởi động / Hoạt động / Thảo luận / Luyện tập / Vận dụng trong từng mục, (3) trọn vẹn bài tập cuối bài SGK & SBT, (4) mục Ghi nhớ & mẹo. Độ dài không giới hạn — viết càng đầy đủ càng tốt. Nếu bài dài bạn ĐƯỢC PHÉP viết dài, tuyệt đối KHÔNG được cắt bớt mục hay tóm tắt lướt qua.`;
 
+      if (stream) {
+        // --- LUỒNG SSE: đẩy token từng phần về client ---
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        });
+        res.flushHeaders?.();
+        try {
+          const { stream: gStream } = await generateContentStreamWithFallback(aiClients, {
+            contents: prompt,
+            config: { systemInstruction, temperature: 0.35 },
+          });
+          res.write(
+            `event: meta\ndata: ${JSON.stringify({
+              lessonTitle,
+              subject,
+              sourceUrl: groundSource?.url || sourceUrl || "",
+            })}\n\n`
+          );
+          let full = "";
+          for await (const chunk of gStream) {
+            const t = chunk?.text || "";
+            if (t) {
+              full += t;
+              res.write(`event: chunk\ndata: ${JSON.stringify({ text: t })}\n\n`);
+            }
+          }
+          await incrementUsage(usageKey(req));
+          await bumpStat("lesson_note", req).catch(() => {});
+          if (full.length > 50 && full !== "Không tạo được nội dung bài học. Vui lòng thử lại.") {
+            await autoEnqueuePendingNote({
+              lessonTitle: String(lessonTitle).trim(),
+              subject: String(subject).trim(),
+              subjectId: String(subjectId || "").trim(),
+              textbook: textbook ? String(textbook).trim() : "Kết nối tri thức với cuộc sống",
+              content: full,
+              noteStyle: noteStyle || "standard",
+            });
+          }
+          res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+        } catch (err: any) {
+          console.error("Error streaming lesson note:", err);
+          res.write(
+            `event: error\ndata: ${JSON.stringify({ error: parseGeminiErrorMessage(err) })}\n\n`
+          );
+        } finally {
+          res.end();
+        }
+        return;
+      }
+
+      // --- LUỒNG JSON (mặc định): chờ đủ rồi trả nguyên khối ---
       const response = await generateContentWithFallback(aiClients, {
         contents: prompt,
         config: {
@@ -3347,28 +4078,14 @@ Hãy trả về bài soạn đầy đủ theo đúng phong cách sư phạm chu�
 
       // Tự động đề xuất bài mẫu chờ admin duyệt (không làm hỏng response nếu lỗi)
       if (content.length > 50 && content !== "Không tạo được nội dung bài học. Vui lòng thử lại.") {
-        try {
-          await insertPendingPreset({
-            id: "pending-auto-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
-            type: "note",
-            title: String(lessonTitle).trim().slice(0, 150),
-            subject: String(subject).trim(),
-            subjectId: String(subjectId || "").trim(),
-            textbook: textbook ? String(textbook).trim() : "Kết nối tri thức với cuộc sống",
-            content: content.slice(0, 20000),
-            date: new Date().toLocaleDateString("vi-VN", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }),
-            style: noteStyle || "standard",
-            author: "Bản soạn tự động",
-            source: "auto",
-            createdAt: new Date().toISOString(),
-          });
-        } catch (err: any) {
-          console.warn("[Pending] Không tự động đề xuất được bài mẫu:", err);
-        }
+        await autoEnqueuePendingNote({
+          lessonTitle: String(lessonTitle).trim(),
+          subject: String(subject).trim(),
+          subjectId: String(subjectId || "").trim(),
+          textbook: textbook ? String(textbook).trim() : "Kết nối tri thức với cuộc sống",
+          content,
+          noteStyle: noteStyle || "standard",
+        });
       }
 
       res.json({ result: content });
