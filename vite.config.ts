@@ -31,7 +31,7 @@ server: {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       // Cho phép truy cập qua domain riêng khi chạy qua Vite middleware
       // (kể cả khi NODE_ENV chưa được set = production, tránh lỗi "Blocked request")
-      allowedHosts: ['studyez.us.ci', '.studyez.us.ci', 'localhost'],
+      allowedHosts: ['hoctaptot.us.ci', '.hoctaptot.us.ci', 'studyez.us.ci', '.studyez.us.ci', 'localhost'],
     },
   };
 });
