@@ -36,9 +36,13 @@ interface CommunityPresetItem {
   grade?: string;
   createdAt: string;
   fromCommunity?: boolean;
+  avgRating?: number;
+  ratingCount?: number;
 }
 
 const COMMUNITY_DATA_FILE = path.join(process.cwd(), "data", "community-presets.json");
+const COMMENTS_DATA_FILE = path.join(process.cwd(), "data", "preset-comments.json");
+const RATINGS_DATA_FILE = path.join(process.cwd(), "data", "preset-ratings.json");
 
 // Kết nối Postgres nếu có DATABASE_URL (Supabase / Neon miễn phí).
 // urlOverride: trên Cloudflare Workers dùng Hyperdrive binding (env.HYPERDRIVE.connectionString),
@@ -240,14 +244,31 @@ function readCommunityListOrSeed(): CommunityPresetItem[] {
 }
 
 async function loadAllPresets(): Promise<CommunityPresetItem[]> {
-  if (pgPool) {
-    const { rows } = await pgPool.query(
-      'SELECT * FROM community_presets ORDER BY "createdAt" DESC'
-    );
-    return rows.map(rowToPreset);
+  const items: CommunityPresetItem[] = pgPool
+    ? (await pgPool.query('SELECT * FROM community_presets ORDER BY "createdAt" DESC')).rows.map(rowToPreset)
+    : readCommunityListOrSeed();
+
+  // Gắn điểm trung bình + số lượt đánh giá cho từng bài mẫu
+  const ratings = pgPool
+    ? (await pgPool.query('SELECT "presetId", rating FROM preset_ratings')).rows
+    : readRatingsSync();
+  const byId: Record<string, { sum: number; count: number }> = {};
+  for (const r of ratings) {
+    const key = String(r.presetId || "");
+    if (!key) continue;
+    const cur = byId[key] || { sum: 0, count: 0 };
+    cur.sum += Number(r.rating);
+    cur.count += 1;
+    byId[key] = cur;
   }
-  // Fallback: file JSON
-  return readCommunityListOrSeed();
+  return items.map((it) => {
+    const s = byId[it.id];
+    return {
+      ...it,
+      avgRating: s ? Math.round((s.sum / s.count) * 10) / 10 : 0,
+      ratingCount: s ? s.count : 0,
+    };
+  });
 }
 
 async function insertPreset(item: CommunityPresetItem) {
@@ -327,6 +348,158 @@ async function bumpViews(id: string): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// BÌNH LUẬN & ĐÁNH GIÁ SAO CHO BÀI MẪU
+// - preset_comments: bình luận (nhiều người, nhiều lượt)
+// - preset_ratings: sao 1-5, mỗi người/thiết bị chỉ 1 lượt (ownerKey)
+// - Lưu PostgreSQL hoặc file JSON fallback.
+// ---------------------------------------------------------------------------
+
+interface PresetComment {
+  id: string;
+  presetId: string;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
+interface PresetRatingRow {
+  presetId: string;
+  ownerKey: string;
+  rating: number;
+  createdAt: string;
+}
+
+function readCommentsSync(): PresetComment[] {
+  try {
+    if (fs.existsSync(COMMENTS_DATA_FILE)) {
+      return JSON.parse(fs.readFileSync(COMMENTS_DATA_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.warn("[Community] Không đọc được bình luận JSON:", err);
+  }
+  return [];
+}
+
+function writeCommentsSync(list: PresetComment[]) {
+  fs.mkdirSync(path.dirname(COMMENTS_DATA_FILE), { recursive: true });
+  fs.writeFileSync(COMMENTS_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+function readRatingsSync(): PresetRatingRow[] {
+  try {
+    if (fs.existsSync(RATINGS_DATA_FILE)) {
+      return JSON.parse(fs.readFileSync(RATINGS_DATA_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.warn("[Community] Không đọc được đánh giá JSON:", err);
+  }
+  return [];
+}
+
+function writeRatingsSync(list: PresetRatingRow[]) {
+  fs.mkdirSync(path.dirname(RATINGS_DATA_FILE), { recursive: true });
+  fs.writeFileSync(RATINGS_DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+function ratingSummary(
+  rows: PresetRatingRow[],
+  presetId: string,
+  mineKey?: string
+): { avg: number; count: number; mine: number | null } {
+  const filtered = rows.filter((r) => r.presetId === presetId);
+  const mine = mineKey ? filtered.find((r) => r.ownerKey === mineKey) : undefined;
+  const count = filtered.length;
+  const avg = count
+    ? Math.round((filtered.reduce((s, r) => s + r.rating, 0) / count) * 10) / 10
+    : 0;
+  return { avg, count, mine: mine ? mine.rating : null };
+}
+
+async function loadPresetDiscussions(
+  presetId: string,
+  mineKey?: string
+): Promise<{ comments: PresetComment[]; rating: { avg: number; count: number; mine: number | null } }> {
+  if (pgPool) {
+    const [{ rows: comments }, { rows: ratings }] = await Promise.all([
+      pgPool.query(
+        'SELECT id, "presetId", author, content, "createdAt" FROM preset_comments WHERE "presetId" = $1 ORDER BY "createdAt" ASC',
+        [presetId]
+      ),
+      pgPool.query('SELECT "presetId", "ownerKey", rating FROM preset_ratings WHERE "presetId" = $1', [
+        presetId,
+      ]),
+    ]);
+    const c: PresetComment[] = comments.map((r: any) => ({
+      id: r.id,
+      presetId: r.presetId,
+      author: r.author,
+      content: r.content,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    }));
+    const rating = ratingSummary(ratings, presetId, mineKey);
+    return { comments: c, rating };
+  }
+  const comments = readCommentsSync().filter((x) => x.presetId === presetId);
+  const rating = ratingSummary(readRatingsSync(), presetId, mineKey);
+  return { comments, rating };
+}
+
+async function addPresetComment(
+  presetId: string,
+  author: string,
+  content: string
+): Promise<PresetComment | null> {
+  const comment: PresetComment = {
+    id: "c" + Date.now() + "-" + Math.random().toString(36).substring(2, 8),
+    presetId,
+    author,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+  if (pgPool) {
+    const { rowCount } = await pgPool.query(
+      `INSERT INTO preset_comments (id, "presetId", author, content)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (id) DO NOTHING`,
+      [comment.id, presetId, author, content]
+    );
+    return rowCount ? comment : null;
+  }
+  const list = readCommentsSync();
+  list.push(comment);
+  writeCommentsSync(list);
+  return comment;
+}
+
+async function setPresetRating(
+  presetId: string,
+  ownerKey: string,
+  rating: number
+): Promise<{ avg: number; count: number; mine: number | null }> {
+  const clamped = Math.min(5, Math.max(1, Math.round(rating)));
+  if (pgPool) {
+    await pgPool.query(
+      `INSERT INTO preset_ratings ("presetId", "ownerKey", rating)
+       VALUES ($1,$2,$3)
+       ON CONFLICT ("presetId", "ownerKey")
+       DO UPDATE SET rating = EXCLUDED.rating`,
+      [presetId, ownerKey, clamped]
+    );
+    const { rows } = await pgPool.query(
+      'SELECT "presetId", "ownerKey", rating FROM preset_ratings WHERE "presetId" = $1',
+      [presetId]
+    );
+    return ratingSummary(rows, presetId, ownerKey);
+  }
+  const list = readRatingsSync();
+  const idx = list.findIndex((r) => r.presetId === presetId && r.ownerKey === ownerKey);
+  if (idx >= 0) list[idx].rating = clamped;
+  else list.push({ presetId, ownerKey, rating: clamped, createdAt: new Date().toISOString() });
+  writeRatingsSync(list);
+  return ratingSummary(list, presetId, ownerKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -1288,6 +1461,24 @@ async function ensureUsageTable(pool: Pool) {
       p256dh TEXT NOT NULL,
       auth TEXT NOT NULL,
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preset_comments (
+      id TEXT PRIMARY KEY,
+      "presetId" TEXT NOT NULL,
+      author TEXT NOT NULL DEFAULT 'Bạn ẩn danh',
+      content TEXT NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preset_ratings (
+      "presetId" TEXT NOT NULL,
+      "ownerKey" TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY ("presetId", "ownerKey")
     )
   `);
   // Đồng bộ các bài học JSON cũ sang PostgreSQL nếu đang chạy với DB (một lần)
@@ -3555,6 +3746,71 @@ Viết bằng tiếng Việt, dễ hiểu, ngắn gọn, dùng bullet points.`;
     } catch (err: any) {
       console.error("Error viewing community preset:", err);
       res.status(500).json({ error: "Không cập nhật được lượt xem." });
+    }
+  });
+
+  // API: Danh sách bình luận + điểm đánh giá của một bài mẫu
+  app.get("/api/community/presets/:id/comments", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const maintenanceMsg = await getMaintenanceMessageFor("presets");
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
+      }
+      const owner = String(req.query.owner || "").slice(0, 100);
+      const data = await loadPresetDiscussions(id, owner);
+      res.json(data);
+    } catch (err: any) {
+      console.error("Error loading preset comments:", err);
+      res.status(500).json({ error: "Không tải được bình luận." });
+    }
+  });
+
+  // API: Thêm bình luận cho một bài mẫu
+  app.post("/api/community/presets/:id/comments", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const content = String(req.body?.content || "").trim().slice(0, 2000);
+      if (!content) {
+        return res.status(400).json({ error: "Bình luận không được để trống." });
+      }
+      const maintenanceMsg = await getMaintenanceMessageFor("presets");
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
+      }
+      const author = String(req.body?.author || "").trim().slice(0, 60) || "Bạn ẩn danh";
+      const comment = await addPresetComment(id, author, content);
+      if (!comment) {
+        return res.status(500).json({ error: "Không lưu được bình luận." });
+      }
+      res.status(201).json({ comment });
+    } catch (err: any) {
+      console.error("Error adding preset comment:", err);
+      res.status(500).json({ error: "Không gửi được bình luận." });
+    }
+  });
+
+  // API: Đánh giá sao (1-5) cho một bài mẫu — 1 người/thiết bị chỉ 1 lượt
+  app.post("/api/community/presets/:id/rating", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const rating = Number(req.body?.rating);
+      const owner = String(req.body?.owner || "").trim().slice(0, 100);
+      if (!owner) {
+        return res.status(400).json({ error: "Thiếu định danh người đánh giá." });
+      }
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Số sao phải là số nguyên từ 1 đến 5." });
+      }
+      const maintenanceMsg = await getMaintenanceMessageFor("presets");
+      if (maintenanceMsg) {
+        return res.status(503).json({ error: `Hệ thống đang bảo trì: ${maintenanceMsg}` });
+      }
+      const result = await setPresetRating(id, owner, rating);
+      res.json({ rating: result });
+    } catch (err: any) {
+      console.error("Error rating community preset:", err);
+      res.status(500).json({ error: "Không đánh giá được bài mẫu." });
     }
   });
 
