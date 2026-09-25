@@ -84,6 +84,17 @@ function preprocessMathContent(content: string): string {
   return text;
 }
 
+/** Gom toàn bộ text con trong blockquote để nhận diện loại. */
+function extractChildrenText(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractChildrenText).join(' ');
+  if (React.isValidElement(node)) {
+    const props = node.props as { children?: React.ReactNode };
+    if (props && props.children) return extractChildrenText(props.children);
+  }
+  return '';
+}
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const processedContent = useMemo(() => preprocessMathContent(content), [content]);
 
@@ -136,11 +147,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             </ol>
           ),
           li: ({ children }) => <li className="pl-1">{children}</li>,
-          blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-amber-400 bg-amber-50/70 rounded-r-lg px-4 py-3 my-3 text-amber-950 font-normal shadow-xs">
-              {children}
-            </blockquote>
-          ),
+          blockquote: ({ children }) => {
+            const txt = extractChildrenText(children);
+            // Phân biệt: khối "Tham khảo thêm" (ngoài nguồn) / cảnh báo QA / trích dẫn thường
+            const cls = /📎|tham khảo|cam khao|ngoài nguồn/i.test(txt)
+              ? 'border-violet-400 bg-violet-50/80 text-violet-950'
+              : /⚠️|chưa đối chiếu|chưa chắc|xem lại/i.test(txt)
+                ? 'border-rose-400 bg-rose-50/80 text-rose-950'
+                : 'border-amber-400 bg-amber-50/70 text-amber-950';
+            return (
+              <blockquote
+                className={`border-l-4 rounded-r-lg px-4 py-3 my-3 font-normal shadow-xs ${cls}`}
+              >
+                {children}
+              </blockquote>
+            );
+          },
           table: ({ children }) => (
             <div className="overflow-x-auto my-4 rounded-lg border border-slate-200">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
