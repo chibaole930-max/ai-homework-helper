@@ -52,10 +52,10 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
     <button
       onClick={onOpen}
       title={tile.title}
-      className="group relative h-full w-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] active:translate-y-0 active:scale-[0.99] transition-all duration-200 flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400"
+      className="group relative w-full rounded-2xl border border-slate-200 bg-white text-left shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] active:translate-y-0 active:scale-[0.99] transition-all duration-200 flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400"
     >
       <div className={`shrink-0 h-1.5 w-full ${tile.accentBar}`} />
-      <div className="flex-1 min-h-0 p-3 sm:p-4 flex flex-col gap-1.5">
+      <div className="p-3 sm:p-4 flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2 shrink-0">
           <div
             className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-white ${tile.iconBg} shadow-md shadow-slate-200/70 group-hover:scale-110 transition-transform duration-200 shrink-0`}
@@ -76,15 +76,15 @@ function FeatureTile({ tile, onOpen }: { tile: TileDef; onOpen: () => void }) {
             {tile.title}
           </h3>
         </div>
-        <p className="text-[11px] font-semibold text-slate-400 leading-none shrink-0">
+        <p className="text-[11px] font-semibold text-slate-400 leading-tight shrink-0">
           {tile.subtitle}
         </p>
 
-        <p className="text-[11px] sm:text-xs text-slate-500 leading-snug line-clamp-2 min-h-0">
+        <p className="text-[11px] sm:text-xs text-slate-500 leading-snug line-clamp-2">
           {tile.desc}
         </p>
 
-        <div className="mt-auto pt-1 min-h-0 overflow-hidden">
+        <div className="pt-1">
           <div className="flex flex-wrap gap-1">
             {tile.chips.map((c) => (
               <span
@@ -365,9 +365,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
       </div>
 
       {/* Tiles */}
-      <Stagger className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 overflow-y-auto">
+      <Stagger className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-3 auto-rows-min content-start gap-2.5 sm:gap-3 overflow-y-auto">
         {tiles.map((t) => (
-          <StaggerItem key={t.feature} className="h-full min-h-0">
+          <StaggerItem key={t.feature} className="min-h-0">
             <FeatureTile tile={t} onOpen={() => onOpenFeature(t.feature)} />
           </StaggerItem>
         ))}
