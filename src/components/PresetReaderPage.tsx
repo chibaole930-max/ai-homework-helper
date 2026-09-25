@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BookmarkPlus,
@@ -65,6 +65,8 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
   const [discussionLoading, setDiscussionLoading] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [ratingBusy, setRatingBusy] = useState(false);
+  const commentAnchorRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   const getOwnerKey = useCallback(() => {
     if (user?.id) return 'user:' + user.id;
@@ -122,7 +124,6 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
           setCommentText('');
           setCommentName('');
           loadDiscussions(data.item.id);
-          // Tăng lượt xem
           fetch(`/api/community/presets/${encodeURIComponent(data.item.id)}/view`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -174,14 +175,11 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
     if (!item || ratingBusy) return;
     setRatingBusy(true);
     try {
-      const res = await fetch(
-        `/api/community/presets/${encodeURIComponent(item.id)}/rating`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating: stars, owner: getOwnerKey() }),
-        }
-      );
+      const res = await fetch(`/api/community/presets/${encodeURIComponent(item.id)}/rating`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: stars, owner: getOwnerKey() }),
+      });
       if (res.ok) {
         const data = await res.json();
         const rating = data.rating;
@@ -201,14 +199,11 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
     if (!item || !commentText.trim() || commentBusy) return;
     setCommentBusy(true);
     try {
-      const res = await fetch(
-        `/api/community/presets/${encodeURIComponent(item.id)}/comments`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: commentText, author: commentName }),
-        }
-      );
+      const res = await fetch(`/api/community/presets/${encodeURIComponent(item.id)}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: commentText, author: commentName }),
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.comment) {
@@ -226,6 +221,119 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
     }
   };
 
+  const jumpToComments = () => {
+    commentAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => commentInputRef.current?.focus(), 350);
+  };
+
+  const renderStars = (size: number) => (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => handleRate(s)}
+          disabled={ratingBusy}
+          title={`${s} sao`}
+          className="p-0.5 transition-transform hover:scale-125 disabled:opacity-60"
+        >
+          <Star
+            style={{ width: size, height: size }}
+            className={`${
+              (discussions.rating.mine ?? 0) >= s
+                ? 'fill-amber-400 text-amber-400'
+                : 'text-slate-300'
+            }`}
+          />
+        </button>
+      ))}
+      <span className="ml-1 text-xs font-bold text-slate-600">
+        {discussions.rating.count > 0 ? (
+          <>
+            {discussions.rating.avg} / 5{' '}
+            <span className="font-medium text-slate-400">({discussions.rating.count})</span>
+          </>
+        ) : (
+          'Chưa có đánh giá'
+        )}
+      </span>
+    </div>
+  );
+
+  const renderCommentList = () =>
+    discussionLoading ? (
+      <div className="flex items-center gap-2 py-3 text-xs text-slate-400">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Đang tải bình luận...
+      </div>
+    ) : discussions.comments.length === 0 ? (
+      <p className="text-xs text-slate-400 italic">
+        Chưa có bình luận nào. Chia sẻ nhận xét của bạn bên dưới!
+      </p>
+    ) : (
+      discussions.comments.map((c) => (
+        <div key={c.id} className="bg-white rounded-xl border border-slate-100 p-3">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold shrink-0">
+              {c.author.charAt(0) || '?'}
+            </span>
+            <span className="text-xs font-bold text-slate-700 truncate">{c.author}</span>
+            <span className="text-[10px] text-slate-400 ml-auto shrink-0">
+              {new Date(c.createdAt).toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })}
+            </span>
+          </div>
+          <p className="text-sm text-slate-600 mt-1.5 leading-relaxed whitespace-pre-wrap break-words">
+            {c.content}
+          </p>
+        </div>
+      ))
+    );
+
+  const renderCommentForm = () => (
+    <div className="space-y-2">
+      <input
+        value={commentName}
+        onChange={(e) => setCommentName(e.target.value)}
+        placeholder="Tên của bạn (không bắt buộc)"
+        maxLength={60}
+        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
+      />
+      <textarea
+        ref={commentInputRef}
+        value={commentText}
+        onChange={(e) => setCommentText(e.target.value)}
+        placeholder="Chia sẻ cảm nhận về bài mẫu này..."
+        rows={3}
+        maxLength={2000}
+        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none resize-none"
+      />
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-[11px] text-slate-400 mr-auto">{commentText.length}/2000</span>
+        <button
+          onClick={handleAddComment}
+          disabled={commentBusy || !commentText.trim()}
+          className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {commentBusy ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Đang gửi...
+            </>
+          ) : (
+            <>
+              <Send className="w-3.5 h-3.5" />
+              Gửi bình luận
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-slate-400">
@@ -242,9 +350,7 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 mx-auto">
             <Sparkles className="w-7 h-7" />
           </div>
-          <h2 className="text-base font-extrabold text-slate-800">
-            Không tìm thấy bài mẫu
-          </h2>
+          <h2 className="text-base font-extrabold text-slate-800">Không tìm thấy bài mẫu</h2>
           <p className="text-sm text-slate-500">{error || 'Bài mẫu có thể đã bị xoá.'}</p>
           <button
             onClick={onBack}
@@ -259,225 +365,160 @@ export const PresetReaderPage: React.FC<PresetReaderPageProps> = ({
   }
 
   const alreadySaved = isItemSaved(item.title, item.subject);
+  const commentCount = discussions.comments.length;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
-        {/* Header */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="p-4 sm:p-6 border-b border-slate-100">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <button
-                onClick={onBack}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Kho bài mẫu
-              </button>
-              <div className="flex items-center gap-2 flex-wrap">
-                {item.fromCommunity ? (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                    <Sparkles className="w-3 h-3" />
-                    Cộng đồng
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    {item.textbook}
-                  </span>
-                )}
-                <button
-                  onClick={handleSave}
-                  disabled={alreadySaved}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
-                    alreadySaved
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  }`}
-                >
-                  {alreadySaved ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      Đã lưu vào vở
-                    </>
-                  ) : (
-                    <>
-                      <BookmarkPlus className="w-3.5 h-3.5" />
-                      Lưu vào vở
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header sticky — luôn thấy chức năng chính */}
+      <header className="shrink-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-[0_2px_14px_rgba(15,23,42,0.06)]">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2">
+          <button
+            onClick={onBack}
+            title="Về Kho bài mẫu"
+            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Kho bài mẫu</span>
+          </button>
 
-            <div className="mt-4 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {item.subject}
-              </span>
-              {item.grade && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200">
-                  Lớp {item.grade}
-                </span>
-              )}
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
-                {item.textbook}
-              </span>
-            </div>
-
-            <h1 className="mt-3 text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
               {item.title}
             </h1>
-
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
-              <span>
-                Đóng góp bởi <b className="text-slate-700">{item.author || 'Kho Học Liệu Mẫu'}</b>
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5" />
-                {item.views || 0} lượt xem
+            <div className="flex items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+              <span className="font-semibold text-emerald-700">{item.subject}</span>
+              {item.grade && <span>Lớp {item.grade}</span>}
+              <span className="inline-flex items-center gap-0.5">
+                <Eye className="w-3 h-3" />
+                {item.views || 0}
               </span>
               {item.avgRating ? (
-                <span className="inline-flex items-center gap-1 text-amber-600">
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  {item.avgRating} ({item.ratingCount || 0} đánh giá)
+                <span className="inline-flex items-center gap-0.5 text-amber-600 font-semibold">
+                  <Star className="w-3 h-3 fill-current" />
+                  {item.avgRating} ({item.ratingCount || 0})
                 </span>
               ) : null}
-              <button
-                onClick={handleLike}
-                className={`inline-flex items-center gap-1 font-bold transition-colors ${
-                  liked ? 'text-emerald-700' : 'text-slate-500 hover:text-emerald-600'
-                }`}
-              >
-                <ThumbsUp className="w-3.5 h-3.5" />
-                {item.likes || 0} thích
-              </button>
+              <span>
+                Bởi <b className="text-slate-600">{item.author || 'Kho Học Liệu Mẫu'}</b>
+              </span>
             </div>
           </div>
 
-          {/* Nội dung */}
-          <div className="p-4 sm:p-6">
-            <MarkdownRenderer content={item.content} />
+          <div className="shrink-0 flex items-center gap-1.5">
+            <button
+              onClick={handleLike}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                liked
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'
+              }`}
+            >
+              <ThumbsUp className="w-3.5 h-3.5" />
+              {item.likes || 0}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={alreadySaved}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                alreadySaved
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {alreadySaved ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{alreadySaved ? 'Đã lưu' : 'Lưu vào vở'}</span>
+            </button>
+            <button
+              onClick={jumpToComments}
+              className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              {commentCount > 0 ? commentCount : 'BL'}
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Đánh giá & Bình luận */}
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
-          <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2 mb-3">
-            <MessageCircle className="w-4 h-4 text-emerald-600" />
-            Đánh giá & bình luận
-          </h3>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => handleRate(s)}
-                  disabled={ratingBusy}
-                  title={`${s} sao`}
-                  className="p-0.5 transition-transform hover:scale-125 disabled:opacity-60"
-                >
-                  <Star
-                    className={`w-6 h-6 ${
-                      (discussions.rating.mine ?? 0) >= s
-                        ? 'fill-amber-400 text-amber-400'
-                        : 'text-slate-300'
-                    }`}
-                  />
-                </button>
-              ))}
+      {/* Body: content trái + panel bình luận phải (desktop) */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+        {/* Nội dung bài */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs p-4 sm:p-6">
+              <MarkdownRenderer content={item.content} />
             </div>
-            <span className="text-xs font-bold text-slate-600">
-              {discussions.rating.count > 0 ? (
-                <>
-                  {discussions.rating.avg} / 5{' '}
-                  <span className="font-medium text-slate-400">
-                    ({discussions.rating.count} lượt)
+
+            {/* Khối bình luận cho mobile (đặt ngay sau nội dung, có neo để scroll tới) */}
+            <div ref={commentAnchorRef} className="lg:hidden mt-4 rounded-2xl border border-slate-200 bg-white shadow-xs p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageCircle className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-extrabold text-slate-800">Đánh giá & bình luận</h3>
+                {discussionLoading ? null : commentCount > 0 ? (
+                  <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                    {commentCount}
                   </span>
-                  {discussions.rating.mine ? (
-                    <span className="ml-1.5 text-[11px] text-emerald-600">
-                      • Bạn đã chấm {discussions.rating.mine} sao
-                    </span>
-                  ) : null}
-                </>
-              ) : (
-                'Chưa có đánh giá — hãy là người đầu tiên!'
-              )}
-            </span>
-          </div>
-
-          <div className="mt-4 space-y-2.5">
-            {discussionLoading ? (
-              <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Đang tải bình luận...
+                ) : null}
               </div>
-            ) : discussions.comments.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">
-                Chưa có bình luận nào. Chia sẻ nhận xét của bạn bên dưới nhé!
-              </p>
-            ) : (
-              discussions.comments.map((c) => (
-                <div key={c.id} className="bg-slate-50 rounded-xl border border-slate-100 p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold shrink-0">
-                      {c.author.charAt(0) || '?'}
-                    </span>
-                    <span className="text-xs font-bold text-slate-700 truncate">{c.author}</span>
-                    <span className="text-[10px] text-slate-400 ml-auto shrink-0">
-                      {new Date(c.createdAt).toLocaleDateString('vi-VN', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600 mt-1.5 leading-relaxed whitespace-pre-wrap break-words">
-                    {c.content}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
-            <input
-              value={commentName}
-              onChange={(e) => setCommentName(e.target.value)}
-              placeholder="Tên của bạn (không bắt buộc)"
-              maxLength={60}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
-            />
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Chia sẻ cảm nhận về bài mẫu này..."
-              rows={3}
-              maxLength={2000}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none resize-none"
-            />
-            <div className="flex items-center justify-end gap-2">
-              <span className="text-[11px] text-slate-400 mr-auto">{commentText.length}/2000</span>
-              <button
-                onClick={handleAddComment}
-                disabled={commentBusy || !commentText.trim()}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {commentBusy ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Đang gửi...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" />
-                    Gửi bình luận
-                  </>
-                )}
-              </button>
+              {renderStars(24)}
+              <div className="mt-3 space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                {renderCommentList()}
+              </div>
+              <div className="mt-3 border-t border-slate-100 pt-3">{renderCommentForm()}</div>
             </div>
           </div>
         </div>
+
+        {/* Panel bình luận cố định (desktop) */}
+        <aside className="hidden lg:flex lg:w-[360px] xl:w-[400px] shrink-0 flex-col border-l border-slate-200 bg-slate-50/70 min-h-0">
+          <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-white">
+            <MessageCircle className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm font-extrabold text-slate-800">Đánh giá & bình luận</span>
+            {discussionLoading ? null : commentCount > 0 ? (
+              <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                {commentCount}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+            {renderStars(24)}
+            <div className="border-t border-slate-200 pt-3 space-y-2.5">{renderCommentList()}</div>
+          </div>
+          <div className="shrink-0 p-4 border-t border-slate-200 bg-white">{renderCommentForm()}</div>
+        </aside>
+      </div>
+
+      {/* Dock nhanh đáy (mobile) — chấm sao + nhảy tới bình luận */}
+      <div className="lg:hidden shrink-0 bg-white border-t border-slate-200 px-3 py-2 flex items-center gap-2">
+        <div className="flex items-center">
+          {[1, 2, 3, 4, 5].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => handleRate(s)}
+              disabled={ratingBusy}
+              aria-label={`${s} sao`}
+              className="p-0.5 transition-transform hover:scale-125 disabled:opacity-60"
+            >
+              <Star
+                className={`w-4 h-4 ${
+                  (discussions.rating.mine ?? 0) >= s
+                    ? 'fill-amber-400 text-amber-400'
+                    : 'text-slate-300'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap">
+          {discussions.rating.count > 0 ? discussions.rating.avg : 'Chưa đánh giá'}
+        </span>
+        <button
+          onClick={jumpToComments}
+          className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          Bình luận{commentCount > 0 ? ` (${commentCount})` : ''}
+        </button>
       </div>
     </div>
   );
